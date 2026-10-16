@@ -1,0 +1,7 @@
+# Compatibility shim so github.com/webview/webview_go (pkg-config: webkit2gtk-4.0)
+# can build on distros that only ship WebKitGTK 4.1 (Ubuntu 24.04+).
+# Used only when webkit2gtk-4.0.pc is not already on the system.
+Name: webkit2gtk-4.0
+Description: Shim mapping webkit2gtk-4.0 to webkit2gtk-4.1
+Version: 2.44.0
+Requires: webkit2gtk-4.1

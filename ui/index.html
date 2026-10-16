@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>Enkoder {{VERSION}}</title>
+  <style>
+    :root {
+      --bg: #12151a;
+      --panel: #1a1f27;
+      --border: #2a3340;
+      --text: #e8edf4;
+      --muted: #8b97a8;
+      --accent: #3d8bfd;
+      --accent-dim: #2a5fad;
+      --ok: #3ecf8e;
+      --danger: #f07178;
+      --warn: #e6c07b;
+      --mono: "Cascadia Mono", "Consolas", "DejaVu Sans Mono", ui-monospace, monospace;
+      --sans: "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%;
+      background: var(--bg); color: var(--text);
+      font: 14px/1.45 var(--sans);
+      color-scheme: dark;
+    }
+    body { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
+    h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: 0.02em; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .row.wrap { flex-wrap: wrap; }
+    .grow { flex: 1; min-width: 0; }
+    label.field {
+      display: flex; flex-direction: column; gap: 4px;
+      font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    input[type="text"], select, textarea {
+      width: 100%;
+      background: var(--panel); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 10px; font: 13px var(--sans);
+    }
+    /* WebKitGTK draws a native GtkComboBox for closed <select> and ignores CSS
+       (appearance, background, color). Keep the real select for JS, hide it, and
+       paint our own face + menu so the closed control is readable. */
+    .select-skin {
+      position: relative;
+      display: block;
+      color-scheme: dark;
+    }
+    .select-skin select {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .select-face {
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding: 8px 28px 8px 10px;
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font: 13px var(--sans);
+      text-transform: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      user-select: none;
+    }
+    .select-face::after {
+      content: "";
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      width: 12px;
+      height: 8px;
+      transform: translateY(-50%);
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23e8edf4' d='M1.2 1.5L6 6.3l4.8-4.8'/%3E%3C/svg%3E") no-repeat center;
+      pointer-events: none;
+    }
+    .select-skin:focus-within .select-face {
+      border-color: var(--accent);
+    }
+    .select-skin.is-disabled .select-face {
+      color: var(--muted);
+      cursor: not-allowed;
+      opacity: 0.85;
+    }
+    .select-menu {
+      display: none;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 2px);
+      z-index: 30;
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      max-height: 220px;
+      overflow: auto;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+    }
+    .select-menu.open { display: block; }
+    .select-item {
+      padding: 8px 10px;
+      font: 13px var(--sans);
+      text-transform: none;
+      cursor: pointer;
+    }
+    .select-item:hover { background: #222833; }
+    .select-item.is-selected { background: var(--accent); color: #fff; }
+    .select-item.is-disabled {
+      color: var(--muted);
+      cursor: not-allowed;
+    }
+    .select-item.is-disabled:hover { background: transparent; }
+    option {
+      background-color: var(--panel);
+      color: var(--text);
+    }
+    input[type="number"] {
+      width: 88px;
+      background: var(--panel); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 10px; font: 13px var(--sans);
+    }
+    button {
+      background: var(--panel); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 14px; cursor: pointer; font: 13px var(--sans);
+    }
+    button:hover { border-color: var(--accent); }
+    button.primary {
+      background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600;
+    }
+    button.primary:hover { background: var(--accent-dim); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .streams {
+      max-height: 200px; overflow: auto;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .stream {
+      display: grid; grid-template-columns: 28px 1fr;
+      gap: 8px; align-items: start;
+      padding: 8px; border-radius: 6px; border: 1px solid transparent;
+    }
+    .stream:hover { background: #222833; }
+    .stream input { margin-top: 2px; }
+    .stream .meta { font-size: 13px; }
+    .stream .type {
+      display: inline-block; font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--muted); margin-bottom: 2px;
+    }
+    .grid-opts {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr 1.1fr 0.7fr auto;
+      gap: 10px; align-items: end;
+    }
+    .grid-quality {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr auto auto;
+      gap: 10px; align-items: end;
+    }
+    .check-field {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 0 2px;
+      font-size: 13px; color: var(--text);
+      text-transform: none; letter-spacing: 0;
+      cursor: pointer;
+    }
+    .check-field input { width: auto; margin: 0; }
+    @media (max-width: 900px) {
+      .grid-opts, .grid-quality { grid-template-columns: 1fr 1fr; }
+    }
+    #log {
+      flex: 1; min-height: 120px; resize: none;
+      font: 12px/1.4 var(--mono); white-space: pre-wrap;
+    }
+    .status { font-size: 12px; color: var(--muted); }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--danger); }
+    .status.warn { color: var(--warn); }
+    .hint { font-size: 12px; color: var(--muted); }
+    #codecHint { margin: 0; }
+    option:disabled { background-color: var(--panel); color: var(--muted); }
+    .progress-wrap {
+      display: none; flex-direction: column; gap: 6px;
+    }
+    .progress-wrap.visible { display: flex; }
+    .progress-meta {
+      display: flex; justify-content: space-between; gap: 12px;
+      font-size: 12px; color: var(--muted);
+    }
+    .progress-bar {
+      height: 10px; border-radius: 999px; background: #0e1218;
+      border: 1px solid var(--border); overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+      transition: width 0.15s linear;
+    }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .topbar h1 { flex: 1; }
+    .topbar h1 .logo { width: 24px; height: 24px; vertical-align: -6px; margin-right: 8px; }
+    .topbar h1 .version { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 4px; }
+    .sysstats {
+      display: flex; flex-wrap: wrap; gap: 6px 14px;
+      font: 12px/1.35 var(--mono); color: var(--muted);
+      padding: 2px 2px 0;
+    }
+    .sysstats .stat { white-space: nowrap; }
+    .sysstats .stat b {
+      color: var(--text); font-weight: 600;
+    }
+    .sysstats .sep { color: var(--border); font-weight: 400; }
+    button.ghost {
+      background: transparent; color: var(--muted); border-color: var(--border);
+      padding: 6px 12px;
+    }
+    button.ghost:hover { color: var(--text); border-color: var(--accent); }
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0; z-index: 100;
+      background: rgba(0, 0, 0, 0.55);
+      align-items: center; justify-content: center; padding: 24px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      width: min(640px, 100%); max-height: min(80vh, 720px);
+      overflow: auto; background: var(--panel);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 18px 20px; box-shadow: 0 16px 48px rgba(0,0,0,0.45);
+    }
+    .modal h2 { margin: 0 0 12px; font-size: 17px; }
+    .modal h3 {
+      margin: 16px 0 6px; font-size: 13px; color: var(--accent);
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .modal h3:first-of-type { margin-top: 4px; }
+    .modal p, .modal li { font-size: 13px; color: var(--text); line-height: 1.5; }
+    .modal p { margin: 0 0 8px; }
+    .modal ul { margin: 0 0 4px; padding-left: 18px; }
+    .modal li { margin-bottom: 6px; color: var(--muted); }
+    .modal li strong { color: var(--text); font-weight: 600; }
+    .modal .modal-actions {
+      display: flex; justify-content: flex-end; margin-top: 16px; gap: 8px;
+    }
+    .modal kbd {
+      font: 12px var(--mono); background: #0e1218; border: 1px solid var(--border);
+      border-radius: 4px; padding: 1px 5px; color: var(--warn);
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>
+    <svg class="logo" viewBox="0 0 256 256" aria-hidden="true">
+      <defs>
+        <linearGradient id="logo-bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#232c3a"/>
+          <stop offset="1" stop-color="#0e1218"/>
+        </linearGradient>
+        <linearGradient id="logo-play" gradientUnits="userSpaceOnUse" x1="70" y1="58" x2="204" y2="198">
+          <stop offset="0" stop-color="#5aa2ff"/>
+          <stop offset="0.4" stop-color="#3d8bfd"/>
+          <stop offset="0.85" stop-color="#3ecf8e"/>
+        </linearGradient>
+      </defs>
+      <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#logo-bg)"/>
+      <rect x="8.5" y="8.5" width="239" height="239" rx="51.5" fill="none" stroke="#3a4656" stroke-width="1"/>
+      <g fill="#0a0d12" stroke="#3a4656" stroke-width="1">
+        <rect x="36" y="22" width="14" height="10" rx="2.5"/>
+        <rect x="36" y="224" width="14" height="10" rx="2.5"/>
+        <rect x="68" y="22" width="14" height="10" rx="2.5"/>
+        <rect x="68" y="224" width="14" height="10" rx="2.5"/>
+        <rect x="100" y="22" width="14" height="10" rx="2.5"/>
+        <rect x="100" y="224" width="14" height="10" rx="2.5"/>
+        <rect x="132" y="22" width="14" height="10" rx="2.5"/>
+        <rect x="132" y="224" width="14" height="10" rx="2.5"/>
+        <rect x="164" y="22" width="14" height="10" rx="2.5"/>
+        <rect x="164" y="224" width="14" height="10" rx="2.5"/>
+        <rect x="196" y="22" width="14" height="10" rx="2.5"/>
+        <rect x="196" y="224" width="14" height="10" rx="2.5"/>
+      </g>
+      <path d="M70 58 L114 81 L114 175 L70 198 Z" fill="url(#logo-play)" stroke="url(#logo-play)" stroke-width="10" stroke-linejoin="round"/>
+        <rect x="117.0" y="80.0" width="12.0" height="12.0" rx="2" fill="url(#logo-play)" opacity="1.00"/>
+        <rect x="117.0" y="94.0" width="12.0" height="12.0" rx="2" fill="url(#logo-play)" opacity="1.00"/>
+        <rect x="117.0" y="108.0" width="12.0" height="12.0" rx="2" fill="url(#logo-play)" opacity="1.00"/>
+        <rect x="117.0" y="122.0" width="12.0" height="12.0" rx="2" fill="url(#logo-play)" opacity="1.00"/>
+        <rect x="117.0" y="136.0" width="12.0" height="12.0" rx="2" fill="url(#logo-play)" opacity="1.00"/>
+        <rect x="117.0" y="150.0" width="12.0" height="12.0" rx="2" fill="url(#logo-play)" opacity="1.00"/>
+        <rect x="117.0" y="164.0" width="12.0" height="12.0" rx="2" fill="url(#logo-play)" opacity="1.00"/>
+        <rect x="131.3" y="94.3" width="11.3" height="11.3" rx="2" fill="url(#logo-play)" opacity="0.91"/>
+        <rect x="131.3" y="108.3" width="11.3" height="11.3" rx="2" fill="url(#logo-play)" opacity="0.91"/>
+        <rect x="131.3" y="122.3" width="11.3" height="11.3" rx="2" fill="url(#logo-play)" opacity="0.91"/>
+        <rect x="131.3" y="136.3" width="11.3" height="11.3" rx="2" fill="url(#logo-play)" opacity="0.91"/>
+        <rect x="131.3" y="150.3" width="11.3" height="11.3" rx="2" fill="url(#logo-play)" opacity="0.91"/>
+        <rect x="145.7" y="108.7" width="10.7" height="10.7" rx="2" fill="url(#logo-play)" opacity="0.82"/>
+        <rect x="145.7" y="122.7" width="10.7" height="10.7" rx="2" fill="url(#logo-play)" opacity="0.82"/>
+        <rect x="145.7" y="136.7" width="10.7" height="10.7" rx="2" fill="url(#logo-play)" opacity="0.82"/>
+        <rect x="160.0" y="109.0" width="10.0" height="10.0" rx="2" fill="url(#logo-play)" opacity="0.72"/>
+        <rect x="160.0" y="123.0" width="10.0" height="10.0" rx="2" fill="url(#logo-play)" opacity="0.72"/>
+        <rect x="160.0" y="137.0" width="10.0" height="10.0" rx="2" fill="url(#logo-play)" opacity="0.72"/>
+        <rect x="174.3" y="123.3" width="9.3" height="9.3" rx="2" fill="url(#logo-play)" opacity="0.63"/>
+    </svg>
+    Enkoder <span class="version">{{VERSION}}</span></h1>
+    <button id="btnHelp" class="ghost" type="button" title="Pomoc">Pomoc</button>
+  </div>
+  <div class="sysstats" id="sysstats" aria-live="polite" title="Obciążenie systemu">
+    <span class="stat">CPU <b id="statCpuPct">—</b><span class="sep"> · </span><b id="statCpuTemp">—</b></span>
+    <span class="stat">GPU <b id="statGpuPct">—</b><span class="sep"> · </span><b id="statGpuTemp">—</b></span>
+    <span class="stat">RAM <b id="statRam">—</b></span>
+    <span class="stat">VRAM <b id="statVram">—</b></span>
+  </div>
+
+  <div id="helpModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="modal">
+      <h2 id="helpTitle">Pomoc — Enkoder {{VERSION}}</h2>
+
+      <h3>Jak zacząć</h3>
+      <ul>
+        <li><strong>Przeglądaj…</strong> — wybierz film źródłowy; program wczyta ścieżki i podpowie nazwę wynikową oraz CQ/CRF wg rozdzielczości (jak encode-advisor).</li>
+        <li>Zaznacz potrzebne ścieżki <strong>video / audio / napisy</strong>.</li>
+        <li>Ustaw kodek, kontener, rozdzielczość i opcje jakości, potem <strong>Koduj</strong>.</li>
+        <li><strong>Anuluj</strong> zatrzymuje uruchomiony proces ffmpeg.</li>
+      </ul>
+
+      <h3>Kodek video</h3>
+      <ul>
+        <li><strong>HEVC NVENC (NVIDIA)</strong> — szybkie kodowanie na karcie; domyślne, gdy NVENC jest dostępne.</li>
+        <li><strong>x265 / libx265 (CPU)</strong> — wolniejsze, jakość jak w encode-advisor (preset <kbd>slow</kbd>); używane automatycznie bez karty NVIDIA.</li>
+        <li><strong>AV1 / SVT-AV1 (CPU)</strong> — ok. 3× szybszy od x265 <kbd>slow</kbd> i ok. 15–35% mniejsze pliki przy podobnej jakości; zawsze 10-bit. Starsze telewizory mogą nie odtwarzać AV1.</li>
+        <li><strong>Kopiuj video</strong> — bez przekodowania obrazu (tylko mux). Niedostępne przy zmianie rozdzielczości / deinterlace.</li>
+      </ul>
+
+      <h3>Kontener</h3>
+      <ul>
+        <li><strong>MKV</strong> — uniwersalny (zalecany): DTS, PGS, wiele ścieżek.</li>
+        <li><strong>MP4</strong> — lepsza kompatybilność z urządzeniami; niektóre napisy/audio mogą nie przejść.</li>
+      </ul>
+
+      <h3>Rozdzielczość</h3>
+      <ul>
+        <li><strong>Bez zmian</strong> — oryginalny rozmiar klatki.</li>
+        <li><strong>Max 1080p / 720p / …</strong> — zmniejsza tylko w dół (np. 4K → Full HD), zachowuje proporcje. Nie powiększa mniejszych źródeł.</li>
+      </ul>
+
+      <h3>Jakość (CQ / CRF)</h3>
+      <ul>
+        <li>Niższa liczba = lepsza jakość i większy plik. <strong>0</strong> to maksymalna jakość (bardzo duże pliki).</li>
+        <li>Po wczytaniu pliku podpowiadane jest CRF z encode-advisor: SD <strong>17</strong>, HD/FHD <strong>18</strong>, UHD <strong>20</strong>.</li>
+        <li>Dla NVENC (CQ) i x265 (CRF) ręczny zakres: <strong>0–51</strong>. AV1 ma własną skalę <strong>0–63</strong>; podpowiedź jest o 3 niższa niż dla x265 (np. 15 zamiast 18) — tak wychodzi podobna jakość.</li>
+      </ul>
+
+      <h3>Preset, tune, 10-bit, HDR</h3>
+      <ul>
+        <li><strong>Preset</strong> — wolniejszy = lepsza kompresja przy tym samym CQ/CRF. libx265 domyślnie <kbd>slow</kbd>; NVENC domyślnie <kbd>p7</kbd>.</li>
+        <li><strong>Tune</strong> (tylko libx265): film / animation / grain — jak w encode-advisor.</li>
+        <li><strong>Szybkość</strong> (tylko libx265): <em>Jakość</em> — sam preset; <em>Zbalansowany</em> — ok. 2× szybciej przy praktycznie tym samym rozmiarze i jakości (<kbd>rect=0</kbd>, <kbd>rskip=2</kbd>); <em>Szybki</em> — jeszcze szybciej kosztem kilku procent rozmiaru. Procesory z AVX-512 i karty NVIDIA (dekodowanie źródła) są wykorzystywane automatycznie.</li>
+        <li><strong>Głębia bitowa</strong> — Auto bierze 10-bit (<kbd>yuv420p10le</kbd>) dla HDR lub źródła &gt;8-bit; inaczej 8-bit.</li>
+        <li><strong>HDR (PQ)</strong> — dla libx265 dokłada <kbd>hdr-opt</kbd> i tagi BT.2020/SMPTE2084; dla NVENC i AV1 kopiuje tagi koloru. Metadane HDR10 (mastering display, MaxCLL) są przenoszone ze źródła; program ostrzega, gdy w źródle są uszkodzone albo gdy ginie warstwa HDR10+.</li>
+        <li><strong>Deinterlace (bwdif)</strong> — zaznaczane automatycznie przy materiale przeplotowym.</li>
+        <li>Przy kodowaniu kopiowane są też <strong>metadane i rozdziały</strong> kontenera; audio i napisy bez rekompresji.</li>
+      </ul>
+
+      <h3>Pasek postępu</h3>
+      <ul>
+        <li>Pokazuje <strong>pozycję w filmie</strong> (to samo co <kbd>time=</kbd> w logu ffmpeg), nie czas zegarowy.</li>
+        <li>Przykład: <kbd>00:07:44 / 02:16:57</kbd> = zakodowano 7:44 z ~2h17 materiału.</li>
+        <li>W logu <kbd>elapsed=</kbd> to czas rzeczywisty, a <kbd>speed=</kbd> ile razy szybciej niż odtwarzanie.</li>
+      </ul>
+
+      <h3>Audio i napisy</h3>
+      <ul>
+        <li>Wybrane ścieżki są <strong>kopiowane</strong> bez ponownego kodowania (najwyższa jakość, szybkie).</li>
+        <li>Nazwa wynikowa podpowiada m.in. zamianę x264→x265 i tag rozdzielczości — możesz ją edytować.</li>
+      </ul>
+
+      <div class="modal-actions">
+        <button id="btnHelpClose" class="primary" type="button">Zamknij</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <label class="field">Plik źródłowy
+      <div class="row">
+        <input id="inputPath" class="grow" type="text" readonly placeholder="Wybierz film…" />
+        <button id="btnBrowseIn" type="button">Przeglądaj…</button>
+      </div>
+    </label>
+    <label class="field">Plik wynikowy
+      <div class="row">
+        <input id="outputPath" class="grow" type="text" placeholder="Nazwa wyjściowa…" />
+        <button id="btnBrowseOut" type="button">Zapisz jako…</button>
+      </div>
+    </label>
+    <p class="hint">Nazwa wynikowa jest podpowiadana z pliku źródła (np. x264 → x265, 4K → 1080p) — możesz ją edytować.</p>
+  </div>
+
+  <div class="panel">
+    <div class="row" style="justify-content: space-between;">
+      <strong style="font-size: 13px;">Ścieżki</strong>
+      <span id="probeStatus" class="status"></span>
+    </div>
+    <div id="streams" class="streams">
+      <div class="hint">Wybierz plik, aby wczytać ścieżki video / audio / napisów.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="grid-opts">
+      <label class="field">Kodek video
+        <span class="select-skin">
+          <select id="codec">
+            <option value="hevc_nvenc">HEVC NVENC (NVIDIA)</option>
+            <option value="libx265">x265 / libx265 (CPU)</option>
+            <option value="libsvtav1">AV1 / SVT-AV1 (CPU)</option>
+            <option value="copy">Kopiuj video</option>
+          </select>
+          <span class="select-face"></span>
+        </span>
+      </label>
+      <label class="field">Kontener
+        <span class="select-skin">
+          <select id="container">
+            <option value="mkv" selected>MKV</option>
+            <option value="mp4">MP4</option>
+          </select>
+          <span class="select-face"></span>
+        </span>
+      </label>
+      <label class="field">Rozdzielczość
+        <span class="select-skin">
+          <select id="resolution">
+            <option value="0" selected>Bez zmian (źródło)</option>
+            <option value="2160">Max 2160p (4K)</option>
+            <option value="1080">Max 1080p (Full HD)</option>
+            <option value="720">Max 720p</option>
+            <option value="480">Max 480p</option>
+          </select>
+          <span class="select-face"></span>
+        </span>
+      </label>
+      <label class="field">Jakość (CQ / CRF)
+        <input id="cq" type="number" min="0" max="51" value="18" />
+      </label>
+      <button id="btnEncode" class="primary" type="button" disabled>Koduj</button>
+    </div>
+    <div class="grid-quality">
+      <label class="field">Preset
+        <span class="select-skin">
+          <select id="preset"></select>
+          <span class="select-face"></span>
+        </span>
+      </label>
+      <label class="field">Tune (libx265)
+        <span class="select-skin">
+          <select id="tune">
+            <option value="" selected>Bez tune</option>
+            <option value="film">film</option>
+            <option value="animation">animation</option>
+            <option value="grain">grain</option>
+          </select>
+          <span class="select-face"></span>
+        </span>
+      </label>
+      <label class="field" title="Dodatkowe skróty analizy x265 na bazie presetu">Szybkość (libx265)
+        <span class="select-skin">
+          <select id="speed">
+            <option value="quality">Jakość</option>
+            <option value="balanced" selected>Zbalansowany ~2×</option>
+            <option value="fast">Szybki ~2,5–3×</option>
+          </select>
+          <span class="select-face"></span>
+        </span>
+      </label>
+      <label class="field">Głębia bitowa
+        <span class="select-skin">
+          <select id="pixFmt">
+            <option value="auto" selected>Auto (ze źródła / HDR)</option>
+            <option value="yuv420p">8-bit (yuv420p)</option>
+            <option value="yuv420p10le">10-bit (yuv420p10le)</option>
+          </select>
+          <span class="select-face"></span>
+        </span>
+      </label>
+      <label class="check-field" title="Filtr bwdif — jak w encode-advisor">
+        <input id="deinterlace" type="checkbox" />
+        Deinterlace (bwdif)
+      </label>
+      <label class="check-field" id="hdrLabel" title="Parametry HDR PQ dla libx265 / tagi koloru dla NVENC">
+        <input id="hdr" type="checkbox" />
+        HDR (PQ)
+      </label>
+    </div>
+    <p id="codecHint" class="hint">Wykrywanie kodeków…</p>
+    <p id="qualityHint" class="hint"></p>
+    <div class="row wrap">
+      <button id="btnPreview" type="button" disabled>Pokaż komendę</button>
+      <button id="btnCancel" type="button" disabled>Anuluj</button>
+      <span id="runStatus" class="status grow"></span>
+    </div>
+  </div>
+
+  <div id="progressWrap" class="progress-wrap">
+    <div class="progress-meta">
+      <span id="progressLabel">0%</span>
+      <span id="progressTime"></span>
+    </div>
+    <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+  </div>
+
+  <textarea id="log" readonly placeholder="Log ffmpeg…"></textarea>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let streams = [];
+    let caps = { nvenc: false, defaultCodec: "libx265", message: "" };
+    let durationSeconds = 0;
+    let sourceQuality = {
+      suggestedCQ: 18,
+      suggestedAV1CQ: 15,
+      hdr10: null,
+      suggestedPixFmt: "yuv420p",
+      suggestedPreset: "slow",
+      hdr: false,
+      dolbyVision: false,
+      interlaced: false,
+      bitsPerSample: 8,
+      colorTransfer: "",
+      colorPrimaries: "",
+      colorSpace: "",
+    };
+
+    const X265_PRESETS = [
+      ["ultrafast", "ultrafast (najszybszy)"],
+      ["superfast", "superfast"],
+      ["veryfast", "veryfast"],
+      ["faster", "faster"],
+      ["fast", "fast"],
+      ["medium", "medium"],
+      ["slow", "slow (zalecany)"],
+      ["slower", "slower"],
+      ["veryslow", "veryslow"],
+      ["placebo", "placebo"],
+    ];
+    const AV1_PRESETS = [
+      ["2", "2 (bardzo wolny)"],
+      ["3", "3"],
+      ["4", "4"],
+      ["5", "5 (zalecany)"],
+      ["6", "6"],
+      ["7", "7"],
+      ["8", "8"],
+      ["10", "10 (najszybszy)"],
+    ];
+    const NVENC_PRESETS = [
+      ["p1", "p1 (najszybszy)"],
+      ["p2", "p2"],
+      ["p3", "p3"],
+      ["p4", "p4"],
+      ["p5", "p5"],
+      ["p6", "p6"],
+      ["p7", "p7 (najwyższa jakość)"],
+    ];
+
+    function paintSelectFaces() {
+      document.querySelectorAll(".select-skin").forEach((skin) => {
+        const sel = skin.querySelector("select");
+        const face = skin.querySelector(".select-face");
+        if (!sel || !face) return;
+        const opt = sel.options[sel.selectedIndex];
+        face.textContent = opt ? opt.text : "";
+        skin.classList.toggle("is-disabled", !!sel.disabled);
+      });
+    }
+
+    function closeSelectMenus() {
+      document.querySelectorAll(".select-menu.open").forEach((m) => m.classList.remove("open"));
+    }
+
+    function wireSelectSkins() {
+      document.querySelectorAll(".select-skin").forEach((skin) => {
+        const sel = skin.querySelector("select");
+        const face = skin.querySelector(".select-face");
+        if (!sel || !face) return;
+        face.tabIndex = 0;
+        face.setAttribute("role", "button");
+        const menu = document.createElement("div");
+        menu.className = "select-menu";
+        skin.appendChild(menu);
+
+        function openMenu() {
+          if (sel.disabled) return;
+          closeSelectMenus();
+          menu.innerHTML = "";
+          [...sel.options].forEach((opt, i) => {
+            const item = document.createElement("div");
+            item.className = "select-item";
+            if (opt.disabled) item.classList.add("is-disabled");
+            if (i === sel.selectedIndex) item.classList.add("is-selected");
+            item.textContent = opt.text;
+            item.addEventListener("mousedown", (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (opt.disabled) return;
+              sel.selectedIndex = i;
+              sel.dispatchEvent(new Event("change", { bubbles: true }));
+              paintSelectFaces();
+              closeSelectMenus();
+            });
+            menu.appendChild(item);
+          });
+          menu.classList.add("open");
+        }
+
+        face.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (menu.classList.contains("open")) closeSelectMenus();
+          else openMenu();
+        });
+        face.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (menu.classList.contains("open")) closeSelectMenus();
+            else openMenu();
+          } else if (e.key === "Escape") {
+            closeSelectMenus();
+          }
+        });
+      });
+      document.addEventListener("click", closeSelectMenus);
+    }
+
+    function selectedIndexes(type) {
+      return streams
+        .filter((s) => s.codec_type === type && $(`s-${s.index}`)?.checked)
+        .map((s) => s.index);
+    }
+
+    function scaleHeight() {
+      return Number($("resolution").value) || 0;
+    }
+
+    // The CQ field follows the codec's suggestion until the user edits it.
+    let cqEdited = false;
+    let cqCodec = "";
+    function suggestedCQFor(codec) {
+      return codec === "libsvtav1" ? sourceQuality.suggestedAV1CQ : sourceQuality.suggestedCQ;
+    }
+    function syncCQForCodec() {
+      const codec = $("codec").value;
+      $("cq").max = codec === "libsvtav1" ? "63" : "51";
+      if (codec !== cqCodec && !cqEdited && codec !== "copy") {
+        $("cq").value = String(suggestedCQFor(codec));
+      }
+      if (codec !== "copy") cqCodec = codec;
+    }
+
+    function parseCQ() {
+      const raw = String($("cq").value ?? "").trim();
+      if (raw === "") return 18;
+      const n = Number(raw);
+      if (!Number.isFinite(n)) return 18;
+      return Math.trunc(n);
+    }
+
+    function resolvedPixFmt() {
+      const v = $("pixFmt").value;
+      if (v === "auto") {
+        // 10-bit AV1 compresses better even from 8-bit sources.
+        if ($("codec").value === "libsvtav1") return "yuv420p10le";
+        return sourceQuality.suggestedPixFmt || "yuv420p";
+      }
+      return v;
+    }
+
+    function fillPresets(keepValue) {
+      const codec = $("codec").value;
+      const sel = $("preset");
+      const prev = keepValue ? sel.value : "";
+      const list = codec === "hevc_nvenc" ? NVENC_PRESETS
+        : codec === "libsvtav1" ? AV1_PRESETS : X265_PRESETS;
+      const fallback = codec === "hevc_nvenc" ? "p7" : codec === "libsvtav1" ? "5" : "slow";
+      sel.innerHTML = list.map(([v, t]) => `<option value="${v}">${t}</option>`).join("");
+      if (codec === "copy") {
+        sel.disabled = true;
+      } else {
+        sel.disabled = false;
+        const ok = list.some(([v]) => v === prev);
+        sel.value = ok ? prev : fallback;
+      }
+      paintSelectFaces();
+    }
+
+    function syncQualityControls() {
+      const codec = $("codec").value;
+      const copy = codec === "copy";
+      const x265 = codec === "libx265";
+      syncCQForCodec();
+      $("preset").disabled = copy;
+      $("tune").disabled = copy || !x265;
+      $("speed").disabled = copy || !x265;
+      $("pixFmt").disabled = copy;
+      $("cq").disabled = copy;
+      $("deinterlace").disabled = copy;
+      $("hdr").disabled = copy;
+      if (!x265) $("tune").value = "";
+      if (copy) {
+        $("qualityHint").textContent = "Kopiuj video — opcje jakości obrazu są wyłączone.";
+      } else {
+        const bits = resolvedPixFmt().includes("10") ? "10-bit" : "8-bit";
+        const parts = [
+          `Preset ${$("preset").value || "—"}`,
+          `CQ/CRF ${parseCQ()}`,
+          bits,
+        ];
+        if (x265 && $("tune").value) parts.push("tune " + $("tune").value);
+        if (x265) parts.push("szybkość: " + $("speed").selectedOptions[0].textContent.replace(/\s*~.*$/, "").toLowerCase());
+        if ($("hdr").checked) parts.push("HDR PQ");
+        if ($("deinterlace").checked) parts.push("bwdif");
+        if ($("hdr").checked && sourceQuality.hdr10) {
+          const h = sourceQuality.hdr10;
+          if (h.problem) {
+            parts.push("uwaga: źródło ma uszkodzone metadane HDR10 (" + h.problem + ") — zostaną skopiowane bez zmian");
+          } else if (h.maxLuminance) {
+            let t = "HDR10 " + Math.round(h.maxLuminance) + " nit";
+            if (h.maxCll) t += ", MaxCLL/FALL " + h.cll + "/" + h.fall;
+            parts.push(t);
+          }
+          if (h.hdr10Plus) parts.push("uwaga: dynamiczne metadane HDR10+ nie zostaną przeniesione (zostaje statyczne HDR10)");
+        }
+        if (sourceQuality.dolbyVision) {
+          parts.push("uwaga: Dolby Vision nie przejdzie przez libx265/NVENC jak warstwa DV");
+        }
+        $("qualityHint").textContent = "Kodowanie: " + parts.join(" · ") +
+          ". Audio/napisy, metadane i rozdziały kopiowane.";
+      }
+      paintSelectFaces();
+    }
+
+    function applySourceQuality(res) {
+      sourceQuality = {
+        suggestedCQ: Number(res.suggestedCQ) || 18,
+        suggestedAV1CQ: Number(res.suggestedAV1CQ) || 15,
+        hdr10: res.hdr10 || null,
+        suggestedPixFmt: res.suggestedPixFmt || "yuv420p",
+        suggestedPreset: res.suggestedPreset || "slow",
+        hdr: !!res.hdr,
+        dolbyVision: !!res.dolbyVision,
+        interlaced: !!res.interlaced,
+        bitsPerSample: Number(res.bitsPerSample) || 8,
+        colorTransfer: res.colorTransfer || "",
+        colorPrimaries: res.colorPrimaries || "",
+        colorSpace: res.colorSpace || "",
+      };
+      cqEdited = false;
+      cqCodec = $("codec").value;
+      $("cq").value = String(suggestedCQFor(cqCodec));
+      $("deinterlace").checked = sourceQuality.interlaced;
+      $("hdr").checked = sourceQuality.hdr &&
+        String(sourceQuality.colorTransfer).toLowerCase() === "smpte2084";
+      $("pixFmt").value = "auto";
+      if ($("codec").value === "libx265") {
+        $("preset").value = sourceQuality.suggestedPreset || "slow";
+      }
+      syncQualityControls();
+    }
+
+    function gatherJob() {
+      return {
+        input: $("inputPath").value.trim(),
+        output: $("outputPath").value.trim(),
+        video: selectedIndexes("video"),
+        audio: selectedIndexes("audio"),
+        subtitle: selectedIndexes("subtitle"),
+        codec: $("codec").value,
+        container: $("container").value,
+        cq: parseCQ(),
+        preset: $("preset").value,
+        tune: $("tune").value,
+        speed: $("speed").value,
+        pixFmt: resolvedPixFmt(),
+        deinterlace: !!$("deinterlace").checked,
+        hdr: !!$("hdr").checked,
+        colorTransfer: sourceQuality.colorTransfer || "",
+        colorPrimaries: sourceQuality.colorPrimaries || "",
+        colorSpace: sourceQuality.colorSpace || "",
+        scaleHeight: scaleHeight(),
+        masterDisplay: (sourceQuality.hdr10 && sourceQuality.hdr10.masterDisplay) || "",
+        maxCll: (sourceQuality.hdr10 && sourceQuality.hdr10.maxCll) || "",
+        durationSeconds: durationSeconds,
+      };
+    }
+
+    function formatClock(sec) {
+      if (!isFinite(sec) || sec < 0) return "--:--:--";
+      sec = Math.floor(sec);
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${pad(h)}:${pad(m)}:${pad(s)}`;
+    }
+
+    // 1 ścieżka; 2–4 ścieżki; 0/5–21/25… ścieżek (też 12–14)
+    function formatSciezki(n) {
+      const abs = Math.abs(n) | 0;
+      const mod10 = abs % 10;
+      const mod100 = abs % 100;
+      let word = "ścieżek";
+      if (abs === 1) word = "ścieżka";
+      else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) word = "ścieżki";
+      return `${abs} ${word}`;
+    }
+
+    function setProgress(percent, current, duration) {
+      const wrap = $("progressWrap");
+      if (!wrap) return;
+      wrap.classList.add("visible");
+      const pct = Math.max(0, Math.min(100, Number(percent) || 0));
+      const cur = Number(current) || 0;
+      const dur = Number(duration) || 0;
+      $("progressFill").style.width = pct.toFixed(1) + "%";
+      $("progressLabel").textContent = pct.toFixed(1) + "%";
+      if (dur > 0) {
+        $("progressTime").textContent = `${formatClock(cur)} / ${formatClock(dur)}`;
+      } else {
+        $("progressTime").textContent = cur > 0 ? formatClock(cur) : "";
+      }
+    }
+
+    // Called from Go via Eval (Linux WebKit path); CustomEvent is a fallback.
+    window.applyEncodeProgress = function (d) {
+      d = d || {};
+      const dur = Number(d.duration) || 0;
+      if (dur > 0) durationSeconds = dur;
+      setProgress(d.percent, d.current, dur || durationSeconds);
+    };
+
+    function resetProgress() {
+      setProgress(0, 0, durationSeconds);
+    }
+
+    function hideProgress() {
+      $("progressWrap").classList.remove("visible");
+      $("progressFill").style.width = "0%";
+      $("progressLabel").textContent = "0%";
+      $("progressTime").textContent = "";
+    }
+
+    function syncCopyVsScale() {
+      const copyOpt = $("codec").querySelector('option[value="copy"]');
+      const scaling = scaleHeight() > 0;
+      if (scaling) {
+        copyOpt.disabled = true;
+        if ($("codec").value === "copy") {
+          $("codec").value = caps.defaultCodec || (caps.nvenc ? "hevc_nvenc" : "libx265");
+        }
+      } else {
+        copyOpt.disabled = false;
+      }
+      paintSelectFaces();
+    }
+
+    function applyCapabilities(c) {
+      caps = c || caps;
+      const nvOpt = $("codec").querySelector('option[value="hevc_nvenc"]');
+      const av1Opt = $("codec").querySelector('option[value="libsvtav1"]');
+      av1Opt.disabled = !caps.svtav1;
+      av1Opt.textContent = caps.svtav1 ? "AV1 / SVT-AV1 (CPU)" : "AV1 / SVT-AV1 (niedostępny w ffmpeg)";
+      if (!caps.nvenc) {
+        nvOpt.disabled = true;
+        nvOpt.textContent = "HEVC NVENC (niedostępny — brak NVIDIA/NVENC)";
+        $("codec").value = caps.defaultCodec || "libx265";
+        $("codecHint").textContent = caps.message || "Brak NVENC — domyślnie libx265 (CPU).";
+        $("codecHint").className = "hint status warn";
+      } else {
+        nvOpt.disabled = false;
+        nvOpt.textContent = "HEVC NVENC (NVIDIA)";
+        $("codec").value = caps.defaultCodec || "hevc_nvenc";
+        $("codecHint").textContent = caps.message || "Wykryto NVENC — domyślnie hevc_nvenc.";
+        $("codecHint").className = "hint status ok";
+      }
+      fillPresets(false);
+      syncCopyVsScale();
+      syncQualityControls();
+    }
+    window.applyCapabilities = applyCapabilities;
+
+    function dashPct(v) {
+      if (v == null || !isFinite(v)) return "—";
+      return Math.round(v) + "%";
+    }
+    function dashTemp(v) {
+      if (v == null || !isFinite(v)) return "—";
+      return Math.round(v) + "°C";
+    }
+    function dashMem(used, total) {
+      if (used == null || total == null || !isFinite(used) || !isFinite(total) || total <= 0) return "—";
+      const fmt = (mb) => {
+        if (mb >= 1024) return (mb / 1024).toFixed(1) + " GB";
+        return Math.round(mb) + " MB";
+      };
+      return fmt(used) + " / " + fmt(total);
+    }
+    function applySystemStats(s) {
+      s = s || {};
+      $("statCpuPct").textContent = dashPct(s.cpuPercent);
+      $("statCpuTemp").textContent = dashTemp(s.cpuTempC);
+      $("statGpuPct").textContent = dashPct(s.gpuPercent);
+      $("statGpuTemp").textContent = dashTemp(s.gpuTempC);
+      $("statRam").textContent = dashMem(s.memUsedMB, s.memTotalMB);
+      $("statVram").textContent = dashMem(s.vramUsedMB, s.vramTotalMB);
+    }
+    window.applySystemStats = applySystemStats;
+
+    function renderStreams(list) {
+      streams = list || [];
+      const box = $("streams");
+      if (!streams.length) {
+        box.innerHTML = `<div class="hint">Brak ścieżek.</div>`;
+        return;
+      }
+      box.innerHTML = streams.map((s) => {
+        let autoCheck = "";
+        if (s.codec_type === "video") autoCheck = "checked";
+        else if (s.codec_type === "audio" && s.disposition && s.disposition.default === 1) autoCheck = "checked";
+        else if (s.codec_type === "audio") {
+          const audios = streams.filter(x => x.codec_type === "audio");
+          autoCheck = audios[0] && audios[0].index === s.index ? "checked" : "";
+        }
+        return `<label class="stream">
+          <input type="checkbox" id="s-${s.index}" ${autoCheck} />
+          <div class="meta">
+            <div class="type">${s.codec_type}</div>
+            <div>${s.label}</div>
+          </div>
+        </label>`;
+      }).join("");
+    }
+
+    function appendLog(line) {
+      const el = $("log");
+      el.value += line + "\n";
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function setBusy(busy) {
+      $("btnEncode").disabled = busy || !$("inputPath").value;
+      $("btnPreview").disabled = busy || !$("inputPath").value;
+      $("btnCancel").disabled = !busy;
+      $("btnBrowseIn").disabled = busy;
+      $("btnBrowseOut").disabled = busy;
+      $("resolution").disabled = busy;
+      $("codec").disabled = busy;
+      $("container").disabled = busy;
+      if (!busy) {
+        syncQualityControls();
+      } else {
+        $("cq").disabled = true;
+        $("preset").disabled = true;
+        $("tune").disabled = true;
+        $("speed").disabled = true;
+        $("pixFmt").disabled = true;
+        $("deinterlace").disabled = true;
+        $("hdr").disabled = true;
+      }
+      paintSelectFaces();
+    }
+
+    async function usePickedInput(path) {
+      if (!path) return;
+      $("inputPath").value = path;
+      $("probeStatus").textContent = "Wczytywanie…";
+      $("probeStatus").className = "status";
+      hideProgress();
+      try {
+        const res = await window.enkoder.probe(path);
+        renderStreams(res.streams);
+        durationSeconds = Number(res.durationSeconds) || 0;
+        applySourceQuality(res);
+        $("outputPath").value = await window.enkoder.suggestName(
+          path, $("container").value, $("codec").value, scaleHeight()
+        );
+        $("probeStatus").textContent = formatSciezki(res.streams.length) +
+          (durationSeconds > 0 ? ` · ${formatClock(durationSeconds)}` : "") +
+          (res.hdr ? " · HDR" : "") +
+          (res.interlaced ? " · przeplot" : "");
+        $("probeStatus").className = "status ok";
+        setBusy(false);
+      } catch (e) {
+        $("probeStatus").textContent = String(e);
+        $("probeStatus").className = "status err";
+        renderStreams([]);
+        durationSeconds = 0;
+        setBusy(true);
+        $("btnBrowseIn").disabled = false;
+      }
+    }
+    window.usePickedInput = usePickedInput;
+    function usePickedOutput(path) {
+      if (path) $("outputPath").value = path;
+    }
+    window.usePickedOutput = usePickedOutput;
+    window.applyPickedInput = function (path, res, suggested, err) {
+      if (path) $("inputPath").value = path;
+      if (err) {
+        $("probeStatus").textContent = String(err);
+        $("probeStatus").className = "status err";
+        renderStreams([]);
+        durationSeconds = 0;
+        setBusy(true);
+        $("btnBrowseIn").disabled = false;
+        return;
+      }
+      res = res || {};
+      renderStreams(res.streams || []);
+      durationSeconds = Number(res.durationSeconds) || 0;
+      applySourceQuality(res);
+      if (suggested) $("outputPath").value = suggested;
+      $("probeStatus").textContent = formatSciezki((res.streams || []).length) +
+        (durationSeconds > 0 ? ` · ${formatClock(durationSeconds)}` : "") +
+        (res.hdr ? " · HDR" : "") +
+        (res.interlaced ? " · przeplot" : "");
+      $("probeStatus").className = "status ok";
+      setBusy(false);
+    };
+
+    $("btnBrowseIn").onclick = async () => {
+      try {
+        const path = await window.enkoder.openInput();
+        if (path) await usePickedInput(path);
+      } catch (e) {
+        $("probeStatus").textContent = String(e);
+        $("probeStatus").className = "status err";
+      }
+    };
+
+    $("btnBrowseOut").onclick = async () => {
+      try {
+        const suggested = $("outputPath").value || "";
+        const path = await window.enkoder.saveOutput(suggested, $("container").value);
+        if (path) $("outputPath").value = path;
+      } catch (e) {
+        appendLog(String(e));
+      }
+    };
+
+    function refreshSuggestedName() {
+      const input = $("inputPath").value;
+      if (!input) {
+        fillPresets(true);
+        syncQualityControls();
+        return;
+      }
+      syncCopyVsScale();
+      fillPresets(true);
+      syncQualityControls();
+      window.enkoder.suggestName(input, $("container").value, $("codec").value, scaleHeight()).then((name) => {
+        $("outputPath").value = name;
+      });
+    }
+
+    $("codec").onchange = refreshSuggestedName;
+    $("container").onchange = refreshSuggestedName;
+    $("resolution").onchange = refreshSuggestedName;
+    ["codec", "container", "resolution", "preset", "tune", "speed", "pixFmt"].forEach((id) => {
+      $(id).addEventListener("change", () => {
+        if (id === "codec") fillPresets(false);
+        syncQualityControls();
+        paintSelectFaces();
+      });
+    });
+    $("cq").addEventListener("input", () => { cqEdited = true; });
+    ["cq", "deinterlace", "hdr"].forEach((id) => {
+      $(id).addEventListener("change", syncQualityControls);
+      $(id).addEventListener("input", syncQualityControls);
+    });
+    fillPresets(false);
+    wireSelectSkins();
+    paintSelectFaces();
+    syncQualityControls();
+
+    $("btnPreview").onclick = async () => {
+      try {
+        const cmd = await window.enkoder.preview(gatherJob());
+        appendLog(cmd);
+      } catch (e) {
+        appendLog("Błąd: " + e);
+      }
+    };
+
+    $("btnEncode").onclick = async () => {
+      $("log").value = "";
+      $("runStatus").textContent = "Kodowanie…";
+      $("runStatus").className = "status";
+      resetProgress();
+      setBusy(true);
+      try {
+        await window.enkoder.encode(gatherJob());
+      } catch (e) {
+        $("runStatus").textContent = String(e);
+        $("runStatus").className = "status err";
+        setBusy(false);
+      }
+    };
+
+    $("btnCancel").onclick = async () => {
+      try {
+        await window.enkoder.cancel();
+      } catch (_) {}
+      $("runStatus").textContent = "Anulowanie…";
+      $("runStatus").className = "status err";
+    };
+
+    function openHelp() { $("helpModal").classList.add("open"); }
+    function closeHelp() { $("helpModal").classList.remove("open"); }
+    $("btnHelp").onclick = openHelp;
+    $("btnHelpClose").onclick = closeHelp;
+    $("helpModal").onclick = (e) => { if (e.target === $("helpModal")) closeHelp(); };
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && $("helpModal").classList.contains("open")) closeHelp();
+    });
+
+    window.addEventListener("enkoder-input-picked", (e) => { usePickedInput(e.detail); });
+    window.addEventListener("enkoder-output-picked", (e) => {
+      if (e.detail) $("outputPath").value = e.detail;
+    });
+    window.addEventListener("enkoder-log", (e) => appendLog(e.detail));
+    window.addEventListener("enkoder-progress", (e) => {
+      window.applyEncodeProgress(e.detail);
+    });
+    window.addEventListener("enkoder-done", (e) => {
+      setProgress(100, durationSeconds, durationSeconds);
+      $("runStatus").textContent = e.detail || "Gotowe.";
+      $("runStatus").className = "status ok";
+      setBusy(false);
+    });
+    window.addEventListener("enkoder-error", (e) => {
+      const msg = e.detail || "Błąd kodowania";
+      appendLog(msg);
+      $("runStatus").textContent = msg;
+      $("runStatus").className = "status err";
+      setBusy(false);
+    });
+    window.addEventListener("enkoder-cancelled", (e) => {
+      $("runStatus").textContent = e.detail || "Anulowano.";
+      $("runStatus").className = "status err";
+      setBusy(false);
+    });
+
+    (async () => {
+      try {
+        const c = await window.enkoder.capabilities();
+        applyCapabilities(c);
+      } catch (e) {
+        applyCapabilities({ nvenc: false, defaultCodec: "libx265", message: "Nie udało się odczytać możliwości NVENC — libx265." });
+        appendLog("capabilities: " + e);
+      }
+    })();
+  </script>
+</body>
+</html>

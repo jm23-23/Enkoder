@@ -1,0 +1,49 @@
+# Builds the .deb and enkoder.exe for a v* tag and attaches them to a GitHub Release.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev dpkg-dev
+
+      - name: Version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Test
+        run: make test
+
+      - name: Build .deb
+        env:
+          MAINTAINER: "Janusz Mieszczak <94230553+jm23-23@users.noreply.github.com>"
+        run: make deb
+
+      - name: Build enkoder.exe
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: "0"
+        run: go build -trimpath -ldflags "-s -w -H windowsgui -X main.version=$VERSION" -o dist/enkoder.exe .
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.deb dist/enkoder.exe \
+            --title "Enkoder $VERSION" --generate-notes

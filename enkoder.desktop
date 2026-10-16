@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Enkoder
+Comment=Re-encode videos with ffmpeg (HEVC / AV1)
+Comment[pl]=Kodowanie wideo przez ffmpeg (HEVC / AV1)
+Exec=enkoder
+Icon=enkoder
+Terminal=false
+Categories=AudioVideo;Video;
+StartupWMClass=enkoder

@@ -1,0 +1,24 @@
+﻿# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+enkoder
+enkoder.exe
+
+# Go
+*.test
+*.out
+/vendor/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Packages
+dist/
+*.deb
