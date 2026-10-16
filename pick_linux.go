@@ -102,16 +102,16 @@ func (a *app) applyPicked(kind, path string) {
 }
 
 func pickOpenFile() (string, error) {
-	return runZenityFile(false, "Wybierz film", "", []string{
-		"--file-filter=Wideo | *.mkv *.mp4 *.avi *.mov *.m4v *.ts *.m2ts *.webm",
-		"--file-filter=Wszystkie pliki | *",
+	return runZenityFile(false, tr("pick_open"), "", []string{
+		"--file-filter=" + tr("filter_video") + " | *.mkv *.mp4 *.avi *.mov *.m4v *.ts *.m2ts *.webm",
+		"--file-filter=" + tr("filter_all") + " | *",
 	})
 }
 
 func pickSaveFile(filename, ext string) (string, error) {
-	return runZenityFile(true, "Zapisz jako", filename, []string{
+	return runZenityFile(true, tr("pick_save"), filename, []string{
 		fmt.Sprintf("--file-filter=%s | *.%s", strings.ToUpper(ext), ext),
-		"--file-filter=Wszystkie pliki | *",
+		"--file-filter=" + tr("filter_all") + " | *",
 	})
 }
 

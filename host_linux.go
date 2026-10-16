@@ -113,7 +113,7 @@ func (h linuxHost) Eval(js string) {
 func newHost() (webviewHost, error) {
 	w := webview.New(false)
 	if w == nil || w.Window() == nil {
-		return nil, errors.New("Nie udało się uruchomić WebKitGTK.\nZainstaluj pakiety: libwebkit2gtk-4.1 (lub 4.0), libgtk-3-0.")
+		return nil, errors.New(tr("webkit_failed"))
 	}
 	w.SetTitle(appTitle())
 	setWindowIcon(w.Window())

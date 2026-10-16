@@ -33,7 +33,7 @@ func newHost() (webviewHost, error) {
 		},
 	})
 	if w == nil {
-		return nil, errors.New("Nie udało się uruchomić WebView2 (Edge Runtime).")
+		return nil, errors.New(tr("webview2_failed"))
 	}
 	return windowsHost{w}, nil
 }

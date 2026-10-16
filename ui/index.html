@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="{{LANG}}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -238,6 +238,19 @@
       padding: 6px 12px;
     }
     button.ghost:hover { color: var(--text); border-color: var(--accent); }
+    .topbar-actions { display: flex; gap: 8px; align-items: center; }
+    .lang-switch { display: flex; }
+    .lang-switch button {
+      background: transparent; color: var(--muted); border-color: var(--border);
+      padding: 6px 10px; font-size: 12px; letter-spacing: 0.04em;
+    }
+    .lang-switch button:first-child { border-radius: 6px 0 0 6px; }
+    .lang-switch button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+    .lang-switch button:hover { color: var(--text); }
+    .lang-switch button.active {
+      background: var(--accent-dim); color: var(--text); border-color: var(--accent);
+      position: relative;
+    }
     .modal-backdrop {
       display: none; position: fixed; inset: 0; z-index: 100;
       background: rgba(0, 0, 0, 0.55);
@@ -323,9 +336,15 @@
         <rect x="174.3" y="123.3" width="9.3" height="9.3" rx="2" fill="url(#logo-play)" opacity="0.63"/>
     </svg>
     Enkoder <span class="version">{{VERSION}}</span></h1>
-    <button id="btnHelp" class="ghost" type="button" title="Pomoc">Pomoc</button>
+    <div class="topbar-actions">
+      <div class="lang-switch" role="group" aria-label="Language">
+        <button type="button" data-set-lang="pl" title="Polski">PL</button>
+        <button type="button" data-set-lang="en" title="English">EN</button>
+      </div>
+      <button id="btnHelp" class="ghost" type="button" data-i18n="help" data-i18n-title="help">Pomoc</button>
+    </div>
   </div>
-  <div class="sysstats" id="sysstats" aria-live="polite" title="Obciążenie systemu">
+  <div class="sysstats" id="sysstats" aria-live="polite" title="Obciążenie systemu" data-i18n-title="sys_load">
     <span class="stat">CPU <b id="statCpuPct">—</b><span class="sep"> · </span><b id="statCpuTemp">—</b></span>
     <span class="stat">GPU <b id="statGpuPct">—</b><span class="sep"> · </span><b id="statGpuTemp">—</b></span>
     <span class="stat">RAM <b id="statRam">—</b></span>
@@ -334,11 +353,13 @@
 
   <div id="helpModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
     <div class="modal">
-      <h2 id="helpTitle">Pomoc — Enkoder {{VERSION}}</h2>
+      <h2 id="helpTitle"><span data-i18n="help">Pomoc</span> — Enkoder {{VERSION}}</h2>
+
+      <div class="help-body" data-help-lang="pl">
 
       <h3>Jak zacząć</h3>
       <ul>
-        <li><strong>Przeglądaj…</strong> — wybierz film źródłowy; program wczyta ścieżki i podpowie nazwę wynikową oraz CQ/CRF wg rozdzielczości (jak encode-advisor).</li>
+        <li><strong>Przeglądaj…</strong> — wybierz film źródłowy; program wczyta ścieżki i podpowie nazwę wynikową oraz CQ/CRF wg rozdzielczości.</li>
         <li>Zaznacz potrzebne ścieżki <strong>video / audio / napisy</strong>.</li>
         <li>Ustaw kodek, kontener, rozdzielczość i opcje jakości, potem <strong>Koduj</strong>.</li>
         <li><strong>Anuluj</strong> zatrzymuje uruchomiony proces ffmpeg.</li>
@@ -347,7 +368,7 @@
       <h3>Kodek video</h3>
       <ul>
         <li><strong>HEVC NVENC (NVIDIA)</strong> — szybkie kodowanie na karcie; domyślne, gdy NVENC jest dostępne.</li>
-        <li><strong>x265 / libx265 (CPU)</strong> — wolniejsze, jakość jak w encode-advisor (preset <kbd>slow</kbd>); używane automatycznie bez karty NVIDIA.</li>
+        <li><strong>x265 / libx265 (CPU)</strong> — wolniejsze, wysoka jakość (preset <kbd>slow</kbd>); używane automatycznie bez karty NVIDIA.</li>
         <li><strong>AV1 / SVT-AV1 (CPU)</strong> — ok. 3× szybszy od x265 <kbd>slow</kbd> i ok. 15–35% mniejsze pliki przy podobnej jakości; zawsze 10-bit. Starsze telewizory mogą nie odtwarzać AV1.</li>
         <li><strong>Kopiuj video</strong> — bez przekodowania obrazu (tylko mux). Niedostępne przy zmianie rozdzielczości / deinterlace.</li>
       </ul>
@@ -367,14 +388,14 @@
       <h3>Jakość (CQ / CRF)</h3>
       <ul>
         <li>Niższa liczba = lepsza jakość i większy plik. <strong>0</strong> to maksymalna jakość (bardzo duże pliki).</li>
-        <li>Po wczytaniu pliku podpowiadane jest CRF z encode-advisor: SD <strong>17</strong>, HD/FHD <strong>18</strong>, UHD <strong>20</strong>.</li>
+        <li>Po wczytaniu pliku podpowiadane jest CRF: SD <strong>17</strong>, HD/FHD <strong>18</strong>, UHD <strong>20</strong>.</li>
         <li>Dla NVENC (CQ) i x265 (CRF) ręczny zakres: <strong>0–51</strong>. AV1 ma własną skalę <strong>0–63</strong>; podpowiedź jest o 3 niższa niż dla x265 (np. 15 zamiast 18) — tak wychodzi podobna jakość.</li>
       </ul>
 
       <h3>Preset, tune, 10-bit, HDR</h3>
       <ul>
         <li><strong>Preset</strong> — wolniejszy = lepsza kompresja przy tym samym CQ/CRF. libx265 domyślnie <kbd>slow</kbd>; NVENC domyślnie <kbd>p7</kbd>.</li>
-        <li><strong>Tune</strong> (tylko libx265): film / animation / grain — jak w encode-advisor.</li>
+        <li><strong>Tune</strong> (tylko libx265): film / animation / grain.</li>
         <li><strong>Szybkość</strong> (tylko libx265): <em>Jakość</em> — sam preset; <em>Zbalansowany</em> — ok. 2× szybciej przy praktycznie tym samym rozmiarze i jakości (<kbd>rect=0</kbd>, <kbd>rskip=2</kbd>); <em>Szybki</em> — jeszcze szybciej kosztem kilku procent rozmiaru. Procesory z AVX-512 i karty NVIDIA (dekodowanie źródła) są wykorzystywane automatycznie.</li>
         <li><strong>Głębia bitowa</strong> — Auto bierze 10-bit (<kbd>yuv420p10le</kbd>) dla HDR lub źródła &gt;8-bit; inaczej 8-bit.</li>
         <li><strong>HDR (PQ)</strong> — dla libx265 dokłada <kbd>hdr-opt</kbd> i tagi BT.2020/SMPTE2084; dla NVENC i AV1 kopiuje tagi koloru. Metadane HDR10 (mastering display, MaxCLL) są przenoszone ze źródła; program ostrzega, gdy w źródle są uszkodzone albo gdy ginie warstwa HDR10+.</li>
@@ -394,53 +415,115 @@
         <li>Wybrane ścieżki są <strong>kopiowane</strong> bez ponownego kodowania (najwyższa jakość, szybkie).</li>
         <li>Nazwa wynikowa podpowiada m.in. zamianę x264→x265 i tag rozdzielczości — możesz ją edytować.</li>
       </ul>
+      </div>
+
+      <div class="help-body" data-help-lang="en" hidden>
+      <h3>Getting started</h3>
+      <ul>
+        <li><strong>Browse…</strong> — choose the source video; Enkoder reads its tracks and suggests an output name and a CQ/CRF value based on the resolution.</li>
+        <li>Check the <strong>video / audio / subtitle</strong> tracks you need.</li>
+        <li>Set the codec, container, resolution and quality options, then <strong>Encode</strong>.</li>
+        <li><strong>Cancel</strong> stops the running ffmpeg process.</li>
+      </ul>
+
+      <h3>Video codec</h3>
+      <ul>
+        <li><strong>HEVC NVENC (NVIDIA)</strong> — fast encoding on the GPU; the default when NVENC is available.</li>
+        <li><strong>x265 / libx265 (CPU)</strong> — slower, high quality (preset <kbd>slow</kbd>); used automatically without an NVIDIA GPU.</li>
+        <li><strong>AV1 / SVT-AV1 (CPU)</strong> — about 3× faster than x265 <kbd>slow</kbd> and about 15–35% smaller files at similar quality; always 10-bit. Older TVs may not play AV1.</li>
+        <li><strong>Copy video</strong> — no re-encoding of the picture (remux only). Not available with scaling / deinterlacing.</li>
+      </ul>
+
+      <h3>Container</h3>
+      <ul>
+        <li><strong>MKV</strong> — universal (recommended): DTS, PGS, many tracks.</li>
+        <li><strong>MP4</strong> — better device compatibility; some subtitles/audio may not fit.</li>
+      </ul>
+
+      <h3>Resolution</h3>
+      <ul>
+        <li><strong>Unchanged</strong> — the original frame size.</li>
+        <li><strong>Max 1080p / 720p / …</strong> — only scales down (e.g. 4K → Full HD) and keeps the aspect ratio. Smaller sources are never upscaled.</li>
+      </ul>
+
+      <h3>Quality (CQ / CRF)</h3>
+      <ul>
+        <li>A lower number = better quality and a bigger file. <strong>0</strong> is maximum quality (very large files).</li>
+        <li>After a file is loaded the suggested CRF is: SD <strong>17</strong>, HD/FHD <strong>18</strong>, UHD <strong>20</strong>.</li>
+        <li>The manual range for NVENC (CQ) and x265 (CRF) is <strong>0–51</strong>. AV1 has its own scale, <strong>0–63</strong>; the suggestion is 3 lower than for x265 (e.g. 15 instead of 18), which gives similar quality.</li>
+      </ul>
+
+      <h3>Preset, tune, 10-bit, HDR</h3>
+      <ul>
+        <li><strong>Preset</strong> — slower = better compression at the same CQ/CRF. libx265 defaults to <kbd>slow</kbd>, NVENC to <kbd>p7</kbd>.</li>
+        <li><strong>Tune</strong> (libx265 only): film / animation / grain.</li>
+        <li><strong>Speed</strong> (libx265 only): <em>Quality</em> — the preset alone; <em>Balanced</em> — about 2× faster at practically the same size and quality (<kbd>rect=0</kbd>, <kbd>rskip=2</kbd>); <em>Fast</em> — faster still, at the cost of a few percent in size. CPUs with AVX-512 and NVIDIA GPUs (source decoding) are used automatically.</li>
+        <li><strong>Bit depth</strong> — Auto picks 10-bit (<kbd>yuv420p10le</kbd>) for HDR or sources above 8-bit, otherwise 8-bit.</li>
+        <li><strong>HDR (PQ)</strong> — for libx265 adds <kbd>hdr-opt</kbd> and the BT.2020/SMPTE 2084 tags; for NVENC and AV1 copies the colour tags. HDR10 metadata (mastering display, MaxCLL) is carried over from the source; Enkoder warns when it is broken in the source or when an HDR10+ layer is lost.</li>
+        <li><strong>Deinterlace (bwdif)</strong> — checked automatically for interlaced sources.</li>
+        <li>When encoding, the container's <strong>metadata and chapters</strong> are copied too; audio and subtitles are not recompressed.</li>
+      </ul>
+
+      <h3>Progress bar</h3>
+      <ul>
+        <li>Shows the <strong>position in the video</strong> (the same as <kbd>time=</kbd> in the ffmpeg log), not wall-clock time.</li>
+        <li>Example: <kbd>00:07:44 / 02:16:57</kbd> = 7:44 of ~2h17 of material encoded.</li>
+        <li>In the log <kbd>elapsed=</kbd> is the real time, and <kbd>speed=</kbd> how many times faster than playback.</li>
+      </ul>
+
+      <h3>Audio and subtitles</h3>
+      <ul>
+        <li>The selected tracks are <strong>copied</strong> without re-encoding (best quality, fast).</li>
+        <li>The suggested output name swaps x264→x265 and the resolution tag, among others — you can edit it.</li>
+      </ul>
+      </div>
 
       <div class="modal-actions">
-        <button id="btnHelpClose" class="primary" type="button">Zamknij</button>
+        <button id="btnHelpClose" class="primary" type="button" data-i18n="close">Zamknij</button>
       </div>
     </div>
   </div>
 
   <div class="panel">
-    <label class="field">Plik źródłowy
+    <label class="field"><span data-i18n="source">Plik źródłowy</span>
       <div class="row">
-        <input id="inputPath" class="grow" type="text" readonly placeholder="Wybierz film…" />
-        <button id="btnBrowseIn" type="button">Przeglądaj…</button>
+        <input id="inputPath" class="grow" type="text" readonly placeholder="Wybierz film…" data-i18n-placeholder="choose_video" />
+        <button id="btnBrowseIn" type="button" data-i18n="browse">Przeglądaj…</button>
       </div>
     </label>
-    <label class="field">Plik wynikowy
+    <label class="field"><span data-i18n="output">Plik wynikowy</span>
       <div class="row">
-        <input id="outputPath" class="grow" type="text" placeholder="Nazwa wyjściowa…" />
-        <button id="btnBrowseOut" type="button">Zapisz jako…</button>
+        <input id="outputPath" class="grow" type="text" placeholder="Nazwa wyjściowa…" data-i18n-placeholder="output_name" />
+        <button id="btnBrowseOut" type="button" data-i18n="save_as">Zapisz jako…</button>
       </div>
     </label>
-    <p class="hint">Nazwa wynikowa jest podpowiadana z pliku źródła (np. x264 → x265, 4K → 1080p) — możesz ją edytować.</p>
+    <p class="hint" data-i18n="output_hint">Nazwa wynikowa jest podpowiadana z pliku źródła (np. x264 → x265, 4K → 1080p) — możesz ją edytować.</p>
   </div>
 
   <div class="panel">
     <div class="row" style="justify-content: space-between;">
-      <strong style="font-size: 13px;">Ścieżki</strong>
+      <strong style="font-size: 13px;" data-i18n="tracks">Ścieżki</strong>
       <span id="probeStatus" class="status"></span>
     </div>
     <div id="streams" class="streams">
-      <div class="hint">Wybierz plik, aby wczytać ścieżki video / audio / napisów.</div>
+      <div class="hint" data-i18n="tracks_empty">Wybierz plik, aby wczytać ścieżki video / audio / napisów.</div>
     </div>
   </div>
 
   <div class="panel">
     <div class="grid-opts">
-      <label class="field">Kodek video
+      <label class="field"><span data-i18n="codec">Kodek video</span>
         <span class="select-skin">
           <select id="codec">
             <option value="hevc_nvenc">HEVC NVENC (NVIDIA)</option>
             <option value="libx265">x265 / libx265 (CPU)</option>
             <option value="libsvtav1">AV1 / SVT-AV1 (CPU)</option>
-            <option value="copy">Kopiuj video</option>
+            <option value="copy" data-i18n="copy_video">Kopiuj video</option>
           </select>
           <span class="select-face"></span>
         </span>
       </label>
-      <label class="field">Kontener
+      <label class="field"><span data-i18n="container">Kontener</span>
         <span class="select-skin">
           <select id="container">
             <option value="mkv" selected>MKV</option>
@@ -449,10 +532,10 @@
           <span class="select-face"></span>
         </span>
       </label>
-      <label class="field">Rozdzielczość
+      <label class="field"><span data-i18n="resolution">Rozdzielczość</span>
         <span class="select-skin">
           <select id="resolution">
-            <option value="0" selected>Bez zmian (źródło)</option>
+            <option value="0" selected data-i18n="res_unchanged">Bez zmian (źródło)</option>
             <option value="2160">Max 2160p (4K)</option>
             <option value="1080">Max 1080p (Full HD)</option>
             <option value="720">Max 720p</option>
@@ -461,10 +544,10 @@
           <span class="select-face"></span>
         </span>
       </label>
-      <label class="field">Jakość (CQ / CRF)
+      <label class="field"><span data-i18n="quality">Jakość (CQ / CRF)</span>
         <input id="cq" type="number" min="0" max="51" value="18" />
       </label>
-      <button id="btnEncode" class="primary" type="button" disabled>Koduj</button>
+      <button id="btnEncode" class="primary" type="button" disabled data-i18n="encode">Koduj</button>
     </div>
     <div class="grid-quality">
       <label class="field">Preset
@@ -476,7 +559,7 @@
       <label class="field">Tune (libx265)
         <span class="select-skin">
           <select id="tune">
-            <option value="" selected>Bez tune</option>
+            <option value="" selected data-i18n="no_tune">Bez tune</option>
             <option value="film">film</option>
             <option value="animation">animation</option>
             <option value="grain">grain</option>
@@ -484,40 +567,40 @@
           <span class="select-face"></span>
         </span>
       </label>
-      <label class="field" title="Dodatkowe skróty analizy x265 na bazie presetu">Szybkość (libx265)
+      <label class="field" title="Dodatkowe skróty analizy x265 na bazie presetu" data-i18n-title="speed_title"><span data-i18n="speed">Szybkość (libx265)</span>
         <span class="select-skin">
           <select id="speed">
-            <option value="quality">Jakość</option>
-            <option value="balanced" selected>Zbalansowany ~2×</option>
-            <option value="fast">Szybki ~2,5–3×</option>
+            <option value="quality" data-i18n="speed_quality">Jakość</option>
+            <option value="balanced" selected data-i18n="speed_balanced">Zbalansowany ~2×</option>
+            <option value="fast" data-i18n="speed_fast">Szybki ~2,5–3×</option>
           </select>
           <span class="select-face"></span>
         </span>
       </label>
-      <label class="field">Głębia bitowa
+      <label class="field"><span data-i18n="bit_depth">Głębia bitowa</span>
         <span class="select-skin">
           <select id="pixFmt">
-            <option value="auto" selected>Auto (ze źródła / HDR)</option>
+            <option value="auto" selected data-i18n="pix_auto">Auto (ze źródła / HDR)</option>
             <option value="yuv420p">8-bit (yuv420p)</option>
             <option value="yuv420p10le">10-bit (yuv420p10le)</option>
           </select>
           <span class="select-face"></span>
         </span>
       </label>
-      <label class="check-field" title="Filtr bwdif — jak w encode-advisor">
+      <label class="check-field" title="Filtr bwdif" data-i18n-title="deint_title">
         <input id="deinterlace" type="checkbox" />
         Deinterlace (bwdif)
       </label>
-      <label class="check-field" id="hdrLabel" title="Parametry HDR PQ dla libx265 / tagi koloru dla NVENC">
+      <label class="check-field" id="hdrLabel" title="Parametry HDR PQ dla libx265 / tagi koloru dla NVENC" data-i18n-title="hdr_title">
         <input id="hdr" type="checkbox" />
         HDR (PQ)
       </label>
     </div>
-    <p id="codecHint" class="hint">Wykrywanie kodeków…</p>
+    <p id="codecHint" class="hint" data-i18n="detecting">Wykrywanie kodeków…</p>
     <p id="qualityHint" class="hint"></p>
     <div class="row wrap">
-      <button id="btnPreview" type="button" disabled>Pokaż komendę</button>
-      <button id="btnCancel" type="button" disabled>Anuluj</button>
+      <button id="btnPreview" type="button" disabled data-i18n="show_command">Pokaż komendę</button>
+      <button id="btnCancel" type="button" disabled data-i18n="cancel">Anuluj</button>
       <span id="runStatus" class="status grow"></span>
     </div>
   </div>
@@ -530,12 +613,13 @@
     <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
   </div>
 
-  <textarea id="log" readonly placeholder="Log ffmpeg…"></textarea>
+  <textarea id="log" readonly placeholder="Log ffmpeg…" data-i18n-placeholder="log"></textarea>
 
   <script>
     const $ = (id) => document.getElementById(id);
     let streams = [];
-    let caps = { nvenc: false, defaultCodec: "libx265", message: "" };
+    let caps = { nvenc: false, defaultCodec: "libx265" };
+    let capsLoaded = false;
     let durationSeconds = 0;
     let sourceQuality = {
       suggestedCQ: 18,
@@ -552,36 +636,243 @@
       colorSpace: "",
     };
 
+    // UI texts. Go fills {{LANG}} with the saved (or system) language; the
+    // PL / EN switch in the header changes it and Go stores the choice.
+    const I18N = {
+      pl: {
+        help: "Pomoc",
+        close: "Zamknij",
+        sys_load: "Obciążenie systemu",
+        source: "Plik źródłowy",
+        choose_video: "Wybierz film…",
+        browse: "Przeglądaj…",
+        output: "Plik wynikowy",
+        output_name: "Nazwa wyjściowa…",
+        save_as: "Zapisz jako…",
+        output_hint: "Nazwa wynikowa jest podpowiadana z pliku źródła (np. x264 → x265, 4K → 1080p) — możesz ją edytować.",
+        tracks: "Ścieżki",
+        tracks_empty: "Wybierz plik, aby wczytać ścieżki video / audio / napisów.",
+        no_tracks: "Brak ścieżek.",
+        type_video: "video",
+        type_audio: "audio",
+        type_subtitle: "napisy",
+        codec: "Kodek video",
+        copy_video: "Kopiuj video",
+        container: "Kontener",
+        resolution: "Rozdzielczość",
+        res_unchanged: "Bez zmian (źródło)",
+        quality: "Jakość (CQ / CRF)",
+        encode: "Koduj",
+        no_tune: "Bez tune",
+        speed: "Szybkość (libx265)",
+        speed_title: "Dodatkowe skróty analizy x265 na bazie presetu",
+        speed_quality: "Jakość",
+        speed_balanced: "Zbalansowany ~2×",
+        speed_fast: "Szybki ~2,5–3×",
+        bit_depth: "Głębia bitowa",
+        pix_auto: "Auto (ze źródła / HDR)",
+        deint_title: "Filtr bwdif",
+        hdr_title: "Parametry HDR PQ dla libx265 / tagi koloru dla NVENC",
+        detecting: "Wykrywanie kodeków…",
+        show_command: "Pokaż komendę",
+        cancel: "Anuluj",
+        log: "Log ffmpeg…",
+        preset_fastest: "najszybszy",
+        preset_recommended: "zalecany",
+        preset_very_slow: "bardzo wolny",
+        preset_best: "najwyższa jakość",
+        av1_ok: "AV1 / SVT-AV1 (CPU)",
+        av1_missing: "AV1 / SVT-AV1 (niedostępny w ffmpeg)",
+        nvenc_ok: "HEVC NVENC (NVIDIA)",
+        nvenc_missing: "HEVC NVENC (niedostępny — brak NVIDIA/NVENC)",
+        caps_nvenc: "Wykryto NVIDIA NVENC — domyślnie hevc_nvenc (CPU libx265 też dostępny).",
+        caps_no_nvenc: "Brak hevc_nvenc w ffmpeg — używany kodek CPU libx265. Opcja NVENC jest niedostępna.",
+        caps_failed: "Nie udało się odczytać możliwości NVENC — libx265.",
+        quality_copy: "Kopiuj video — opcje jakości obrazu są wyłączone.",
+        hint_encoding: "Kodowanie: ",
+        hint_copied: ". Audio/napisy, metadane i rozdziały kopiowane.",
+        hint_speed: "szybkość: ",
+        hdr10_broken: (p) => "uwaga: źródło ma uszkodzone metadane HDR10 (" + p + ") — zostaną skopiowane bez zmian",
+        hdr10plus_lost: "uwaga: dynamiczne metadane HDR10+ nie zostaną przeniesione (zostaje statyczne HDR10)",
+        dv_lost: "uwaga: Dolby Vision nie przejdzie przez libx265/NVENC jak warstwa DV",
+        problem_primaries_range: "współrzędne barw poza zakresem",
+        problem_primaries_degenerate: "zdegenerowane barwy podstawowe (np. x = y)",
+        problem_luminance: "nieprawidłowa luminancja",
+        // 1 ścieżka; 2–4 ścieżki; 0/5–21/25… ścieżek (też 12–14)
+        track_count: (n) => {
+          const mod10 = n % 10, mod100 = n % 100;
+          let word = "ścieżek";
+          if (n === 1) word = "ścieżka";
+          else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) word = "ścieżki";
+          return `${n} ${word}`;
+        },
+        interlaced: "przeplot",
+        loading: "Wczytywanie…",
+        error_prefix: "Błąd: ",
+        encoding: "Kodowanie…",
+        cancelling: "Anulowanie…",
+        done: "Gotowe.",
+        cancelled: "Anulowano.",
+        encode_error: "Błąd kodowania",
+      },
+      en: {
+        help: "Help",
+        close: "Close",
+        sys_load: "System load",
+        source: "Source file",
+        choose_video: "Choose a video…",
+        browse: "Browse…",
+        output: "Output file",
+        output_name: "Output name…",
+        save_as: "Save as…",
+        output_hint: "The output name is suggested from the source file (e.g. x264 → x265, 4K → 1080p) — you can edit it.",
+        tracks: "Tracks",
+        tracks_empty: "Choose a file to load its video / audio / subtitle tracks.",
+        no_tracks: "No tracks.",
+        type_video: "video",
+        type_audio: "audio",
+        type_subtitle: "subtitles",
+        codec: "Video codec",
+        copy_video: "Copy video",
+        container: "Container",
+        resolution: "Resolution",
+        res_unchanged: "Unchanged (source)",
+        quality: "Quality (CQ / CRF)",
+        encode: "Encode",
+        no_tune: "No tune",
+        speed: "Speed (libx265)",
+        speed_title: "Extra x265 analysis shortcuts on top of the preset",
+        speed_quality: "Quality",
+        speed_balanced: "Balanced ~2×",
+        speed_fast: "Fast ~2.5–3×",
+        bit_depth: "Bit depth",
+        pix_auto: "Auto (from source / HDR)",
+        deint_title: "bwdif filter",
+        hdr_title: "HDR PQ parameters for libx265 / colour tags for NVENC",
+        detecting: "Detecting codecs…",
+        show_command: "Show command",
+        cancel: "Cancel",
+        log: "ffmpeg log…",
+        preset_fastest: "fastest",
+        preset_recommended: "recommended",
+        preset_very_slow: "very slow",
+        preset_best: "best quality",
+        av1_ok: "AV1 / SVT-AV1 (CPU)",
+        av1_missing: "AV1 / SVT-AV1 (not available in ffmpeg)",
+        nvenc_ok: "HEVC NVENC (NVIDIA)",
+        nvenc_missing: "HEVC NVENC (not available — no NVIDIA/NVENC)",
+        caps_nvenc: "NVIDIA NVENC detected — hevc_nvenc by default (CPU libx265 is available too).",
+        caps_no_nvenc: "ffmpeg has no hevc_nvenc — using the CPU codec libx265. NVENC is not available.",
+        caps_failed: "Could not read the NVENC capabilities — using libx265.",
+        quality_copy: "Copy video — picture quality options are disabled.",
+        hint_encoding: "Encoding: ",
+        hint_copied: ". Audio/subtitles, metadata and chapters are copied.",
+        hint_speed: "speed: ",
+        hdr10_broken: (p) => "warning: the source has broken HDR10 metadata (" + p + ") — it will be copied unchanged",
+        hdr10plus_lost: "warning: dynamic HDR10+ metadata will not be carried over (static HDR10 stays)",
+        dv_lost: "warning: Dolby Vision will not survive libx265/NVENC as a DV layer",
+        problem_primaries_range: "colour primaries out of range",
+        problem_primaries_degenerate: "degenerate colour primaries (e.g. x = y)",
+        problem_luminance: "invalid luminance",
+        track_count: (n) => `${n} ${n === 1 ? "track" : "tracks"}`,
+        interlaced: "interlaced",
+        loading: "Loading…",
+        error_prefix: "Error: ",
+        encoding: "Encoding…",
+        cancelling: "Cancelling…",
+        done: "Done.",
+        cancelled: "Cancelled.",
+        encode_error: "Encoding failed",
+      },
+    };
+    let uiLang = I18N["{{LANG}}"] ? "{{LANG}}" : "en";
+
+    function t(key, ...args) {
+      let v = I18N[uiLang][key];
+      if (v === undefined) v = I18N.en[key];
+      if (v === undefined) return key;
+      return typeof v === "function" ? v(...args) : v;
+    }
+
+    // setT shows a translated text and remembers its key, so a language
+    // switch re-renders it; setRaw is for texts from ffmpeg / Go.
+    function setT(el, key, ...args) {
+      el.dataset.i18n = key;
+      el.dataset.i18nArgs = JSON.stringify(args);
+      el.textContent = t(key, ...args);
+    }
+    function setRaw(el, text) {
+      delete el.dataset.i18n;
+      delete el.dataset.i18nArgs;
+      el.textContent = text;
+    }
+
+    function applyI18n() {
+      document.documentElement.lang = uiLang;
+      document.querySelectorAll("[data-i18n]").forEach((el) => {
+        const args = el.dataset.i18nArgs ? JSON.parse(el.dataset.i18nArgs) : [];
+        el.textContent = t(el.dataset.i18n, ...args);
+      });
+      document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+        el.title = t(el.dataset.i18nTitle);
+      });
+      document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+        el.placeholder = t(el.dataset.i18nPlaceholder);
+      });
+      document.querySelectorAll("[data-help-lang]").forEach((el) => {
+        el.hidden = el.dataset.helpLang !== uiLang;
+      });
+      document.querySelectorAll("[data-set-lang]").forEach((b) => {
+        b.classList.toggle("active", b.dataset.setLang === uiLang);
+        b.setAttribute("aria-pressed", String(b.dataset.setLang === uiLang));
+      });
+    }
+
+    function switchLanguage(l) {
+      if (!I18N[l] || l === uiLang) return;
+      uiLang = l;
+      applyI18n();
+      fillPresets(true);
+      if (capsLoaded) paintCapsTexts();
+      syncQualityControls();
+      // Fire and forget: on Linux Bind promises may never resolve.
+      try {
+        const p = window.enkoder.setLanguage(l);
+        if (p && typeof p.catch === "function") p.catch(() => {});
+      } catch (_) {}
+    }
+
+    // [value, label suffix key]
     const X265_PRESETS = [
-      ["ultrafast", "ultrafast (najszybszy)"],
-      ["superfast", "superfast"],
-      ["veryfast", "veryfast"],
-      ["faster", "faster"],
-      ["fast", "fast"],
-      ["medium", "medium"],
-      ["slow", "slow (zalecany)"],
-      ["slower", "slower"],
-      ["veryslow", "veryslow"],
-      ["placebo", "placebo"],
+      ["ultrafast", "preset_fastest"],
+      ["superfast"],
+      ["veryfast"],
+      ["faster"],
+      ["fast"],
+      ["medium"],
+      ["slow", "preset_recommended"],
+      ["slower"],
+      ["veryslow"],
+      ["placebo"],
     ];
     const AV1_PRESETS = [
-      ["2", "2 (bardzo wolny)"],
-      ["3", "3"],
-      ["4", "4"],
-      ["5", "5 (zalecany)"],
-      ["6", "6"],
-      ["7", "7"],
-      ["8", "8"],
-      ["10", "10 (najszybszy)"],
+      ["2", "preset_very_slow"],
+      ["3"],
+      ["4"],
+      ["5", "preset_recommended"],
+      ["6"],
+      ["7"],
+      ["8"],
+      ["10", "preset_fastest"],
     ];
     const NVENC_PRESETS = [
-      ["p1", "p1 (najszybszy)"],
-      ["p2", "p2"],
-      ["p3", "p3"],
-      ["p4", "p4"],
-      ["p5", "p5"],
-      ["p6", "p6"],
-      ["p7", "p7 (najwyższa jakość)"],
+      ["p1", "preset_fastest"],
+      ["p2"],
+      ["p3"],
+      ["p4"],
+      ["p5"],
+      ["p6"],
+      ["p7", "preset_best"],
     ];
 
     function paintSelectFaces() {
@@ -703,7 +994,8 @@
       const list = codec === "hevc_nvenc" ? NVENC_PRESETS
         : codec === "libsvtav1" ? AV1_PRESETS : X265_PRESETS;
       const fallback = codec === "hevc_nvenc" ? "p7" : codec === "libsvtav1" ? "5" : "slow";
-      sel.innerHTML = list.map(([v, t]) => `<option value="${v}">${t}</option>`).join("");
+      sel.innerHTML = list.map(([v, k]) =>
+        `<option value="${v}">${v}${k ? " (" + t(k) + ")" : ""}</option>`).join("");
       if (codec === "copy") {
         sel.disabled = true;
       } else {
@@ -728,7 +1020,7 @@
       $("hdr").disabled = copy;
       if (!x265) $("tune").value = "";
       if (copy) {
-        $("qualityHint").textContent = "Kopiuj video — opcje jakości obrazu są wyłączone.";
+        $("qualityHint").textContent = t("quality_copy");
       } else {
         const bits = resolvedPixFmt().includes("10") ? "10-bit" : "8-bit";
         const parts = [
@@ -737,25 +1029,24 @@
           bits,
         ];
         if (x265 && $("tune").value) parts.push("tune " + $("tune").value);
-        if (x265) parts.push("szybkość: " + $("speed").selectedOptions[0].textContent.replace(/\s*~.*$/, "").toLowerCase());
+        if (x265) parts.push(t("hint_speed") + $("speed").selectedOptions[0].textContent.replace(/\s*~.*$/, "").toLowerCase());
         if ($("hdr").checked) parts.push("HDR PQ");
         if ($("deinterlace").checked) parts.push("bwdif");
         if ($("hdr").checked && sourceQuality.hdr10) {
           const h = sourceQuality.hdr10;
           if (h.problem) {
-            parts.push("uwaga: źródło ma uszkodzone metadane HDR10 (" + h.problem + ") — zostaną skopiowane bez zmian");
+            parts.push(t("hdr10_broken", t("problem_" + h.problem)));
           } else if (h.maxLuminance) {
             let t = "HDR10 " + Math.round(h.maxLuminance) + " nit";
             if (h.maxCll) t += ", MaxCLL/FALL " + h.cll + "/" + h.fall;
             parts.push(t);
           }
-          if (h.hdr10Plus) parts.push("uwaga: dynamiczne metadane HDR10+ nie zostaną przeniesione (zostaje statyczne HDR10)");
+          if (h.hdr10Plus) parts.push(t("hdr10plus_lost"));
         }
         if (sourceQuality.dolbyVision) {
-          parts.push("uwaga: Dolby Vision nie przejdzie przez libx265/NVENC jak warstwa DV");
+          parts.push(t("dv_lost"));
         }
-        $("qualityHint").textContent = "Kodowanie: " + parts.join(" · ") +
-          ". Audio/napisy, metadane i rozdziały kopiowane.";
+        $("qualityHint").textContent = t("hint_encoding") + parts.join(" · ") + t("hint_copied");
       }
       paintSelectFaces();
     }
@@ -824,16 +1115,12 @@
       return `${pad(h)}:${pad(m)}:${pad(s)}`;
     }
 
-    // 1 ścieżka; 2–4 ścieżki; 0/5–21/25… ścieżek (też 12–14)
-    function formatSciezki(n) {
-      const abs = Math.abs(n) | 0;
-      const mod10 = abs % 10;
-      const mod100 = abs % 100;
-      let word = "ścieżek";
-      if (abs === 1) word = "ścieżka";
-      else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) word = "ścieżki";
-      return `${abs} ${word}`;
-    }
+    // "3 tracks · 02:16:57 · HDR · interlaced" under the track list.
+    I18N.pl.probe_summary = I18N.en.probe_summary = (n, dur, hdr, interlaced) =>
+      t("track_count", Math.abs(n) | 0) +
+      (dur > 0 ? ` · ${formatClock(dur)}` : "") +
+      (hdr ? " · HDR" : "") +
+      (interlaced ? " · " + t("interlaced") : "");
 
     function setProgress(percent, current, duration) {
       const wrap = $("progressWrap");
@@ -884,25 +1171,26 @@
       paintSelectFaces();
     }
 
+    // paintCapsTexts sets the codec labels and hint that depend on caps.
+    function paintCapsTexts() {
+      const nvOpt = $("codec").querySelector('option[value="hevc_nvenc"]');
+      const av1Opt = $("codec").querySelector('option[value="libsvtav1"]');
+      av1Opt.textContent = t(caps.svtav1 ? "av1_ok" : "av1_missing");
+      nvOpt.textContent = t(caps.nvenc ? "nvenc_ok" : "nvenc_missing");
+      setT($("codecHint"), caps.failed ? "caps_failed" : caps.nvenc ? "caps_nvenc" : "caps_no_nvenc");
+      $("codecHint").className = caps.nvenc ? "hint status ok" : "hint status warn";
+      paintSelectFaces();
+    }
+
     function applyCapabilities(c) {
       caps = c || caps;
+      capsLoaded = true;
       const nvOpt = $("codec").querySelector('option[value="hevc_nvenc"]');
       const av1Opt = $("codec").querySelector('option[value="libsvtav1"]');
       av1Opt.disabled = !caps.svtav1;
-      av1Opt.textContent = caps.svtav1 ? "AV1 / SVT-AV1 (CPU)" : "AV1 / SVT-AV1 (niedostępny w ffmpeg)";
-      if (!caps.nvenc) {
-        nvOpt.disabled = true;
-        nvOpt.textContent = "HEVC NVENC (niedostępny — brak NVIDIA/NVENC)";
-        $("codec").value = caps.defaultCodec || "libx265";
-        $("codecHint").textContent = caps.message || "Brak NVENC — domyślnie libx265 (CPU).";
-        $("codecHint").className = "hint status warn";
-      } else {
-        nvOpt.disabled = false;
-        nvOpt.textContent = "HEVC NVENC (NVIDIA)";
-        $("codec").value = caps.defaultCodec || "hevc_nvenc";
-        $("codecHint").textContent = caps.message || "Wykryto NVENC — domyślnie hevc_nvenc.";
-        $("codecHint").className = "hint status ok";
-      }
+      nvOpt.disabled = !caps.nvenc;
+      $("codec").value = caps.defaultCodec || (caps.nvenc ? "hevc_nvenc" : "libx265");
+      paintCapsTexts();
       fillPresets(false);
       syncCopyVsScale();
       syncQualityControls();
@@ -940,7 +1228,7 @@
       streams = list || [];
       const box = $("streams");
       if (!streams.length) {
-        box.innerHTML = `<div class="hint">Brak ścieżek.</div>`;
+        box.innerHTML = `<div class="hint" data-i18n="no_tracks">${t("no_tracks")}</div>`;
         return;
       }
       box.innerHTML = streams.map((s) => {
@@ -954,7 +1242,9 @@
         return `<label class="stream">
           <input type="checkbox" id="s-${s.index}" ${autoCheck} />
           <div class="meta">
-            <div class="type">${s.codec_type}</div>
+            ${I18N.en["type_" + s.codec_type]
+              ? `<div class="type" data-i18n="type_${s.codec_type}">${t("type_" + s.codec_type)}</div>`
+              : `<div class="type">${s.codec_type}</div>`}
             <div>${s.label}</div>
           </div>
         </label>`;
@@ -993,7 +1283,7 @@
     async function usePickedInput(path) {
       if (!path) return;
       $("inputPath").value = path;
-      $("probeStatus").textContent = "Wczytywanie…";
+      setT($("probeStatus"), "loading");
       $("probeStatus").className = "status";
       hideProgress();
       try {
@@ -1004,14 +1294,11 @@
         $("outputPath").value = await window.enkoder.suggestName(
           path, $("container").value, $("codec").value, scaleHeight()
         );
-        $("probeStatus").textContent = formatSciezki(res.streams.length) +
-          (durationSeconds > 0 ? ` · ${formatClock(durationSeconds)}` : "") +
-          (res.hdr ? " · HDR" : "") +
-          (res.interlaced ? " · przeplot" : "");
+        setT($("probeStatus"), "probe_summary", res.streams.length, durationSeconds, !!res.hdr, !!res.interlaced);
         $("probeStatus").className = "status ok";
         setBusy(false);
       } catch (e) {
-        $("probeStatus").textContent = String(e);
+        setRaw($("probeStatus"), String(e));
         $("probeStatus").className = "status err";
         renderStreams([]);
         durationSeconds = 0;
@@ -1027,7 +1314,7 @@
     window.applyPickedInput = function (path, res, suggested, err) {
       if (path) $("inputPath").value = path;
       if (err) {
-        $("probeStatus").textContent = String(err);
+        setRaw($("probeStatus"), String(err));
         $("probeStatus").className = "status err";
         renderStreams([]);
         durationSeconds = 0;
@@ -1040,10 +1327,7 @@
       durationSeconds = Number(res.durationSeconds) || 0;
       applySourceQuality(res);
       if (suggested) $("outputPath").value = suggested;
-      $("probeStatus").textContent = formatSciezki((res.streams || []).length) +
-        (durationSeconds > 0 ? ` · ${formatClock(durationSeconds)}` : "") +
-        (res.hdr ? " · HDR" : "") +
-        (res.interlaced ? " · przeplot" : "");
+      setT($("probeStatus"), "probe_summary", (res.streams || []).length, durationSeconds, !!res.hdr, !!res.interlaced);
       $("probeStatus").className = "status ok";
       setBusy(false);
     };
@@ -1053,7 +1337,7 @@
         const path = await window.enkoder.openInput();
         if (path) await usePickedInput(path);
       } catch (e) {
-        $("probeStatus").textContent = String(e);
+        setRaw($("probeStatus"), String(e));
         $("probeStatus").className = "status err";
       }
     };
@@ -1098,6 +1382,10 @@
       $(id).addEventListener("change", syncQualityControls);
       $(id).addEventListener("input", syncQualityControls);
     });
+    document.querySelectorAll("[data-set-lang]").forEach((b) => {
+      b.addEventListener("click", () => switchLanguage(b.dataset.setLang));
+    });
+    applyI18n();
     fillPresets(false);
     wireSelectSkins();
     paintSelectFaces();
@@ -1108,20 +1396,20 @@
         const cmd = await window.enkoder.preview(gatherJob());
         appendLog(cmd);
       } catch (e) {
-        appendLog("Błąd: " + e);
+        appendLog(t("error_prefix") + e);
       }
     };
 
     $("btnEncode").onclick = async () => {
       $("log").value = "";
-      $("runStatus").textContent = "Kodowanie…";
+      setT($("runStatus"), "encoding");
       $("runStatus").className = "status";
       resetProgress();
       setBusy(true);
       try {
         await window.enkoder.encode(gatherJob());
       } catch (e) {
-        $("runStatus").textContent = String(e);
+        setRaw($("runStatus"), String(e));
         $("runStatus").className = "status err";
         setBusy(false);
       }
@@ -1131,7 +1419,7 @@
       try {
         await window.enkoder.cancel();
       } catch (_) {}
-      $("runStatus").textContent = "Anulowanie…";
+      setT($("runStatus"), "cancelling");
       $("runStatus").className = "status err";
     };
 
@@ -1154,19 +1442,19 @@
     });
     window.addEventListener("enkoder-done", (e) => {
       setProgress(100, durationSeconds, durationSeconds);
-      $("runStatus").textContent = e.detail || "Gotowe.";
+      setT($("runStatus"), "done");
       $("runStatus").className = "status ok";
       setBusy(false);
     });
     window.addEventListener("enkoder-error", (e) => {
-      const msg = e.detail || "Błąd kodowania";
+      const msg = e.detail || t("encode_error");
       appendLog(msg);
-      $("runStatus").textContent = msg;
+      setRaw($("runStatus"), msg);
       $("runStatus").className = "status err";
       setBusy(false);
     });
     window.addEventListener("enkoder-cancelled", (e) => {
-      $("runStatus").textContent = e.detail || "Anulowano.";
+      setT($("runStatus"), "cancelled");
       $("runStatus").className = "status err";
       setBusy(false);
     });
@@ -1176,7 +1464,7 @@
         const c = await window.enkoder.capabilities();
         applyCapabilities(c);
       } catch (e) {
-        applyCapabilities({ nvenc: false, defaultCodec: "libx265", message: "Nie udało się odczytać możliwości NVENC — libx265." });
+        applyCapabilities({ nvenc: false, defaultCodec: "libx265", failed: true });
         appendLog("capabilities: " + e);
       }
     })();

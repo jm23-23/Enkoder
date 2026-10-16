@@ -35,7 +35,7 @@ func extraToolCandidates(name string) []string {
 
 func missingToolsMessage() string {
 	if runtime.GOOS == "windows" {
-		return "Nie znaleziono ffmpeg/ffprobe w PATH.\nZainstaluj FFmpeg i dodaj folder bin do PATH\nlub umieść je w c:\\ffmpeg\\bin\\."
+		return tr("missing_tools_win")
 	}
-	return "Nie znaleziono ffmpeg/ffprobe w PATH.\nZainstaluj FFmpeg (np. sudo apt install ffmpeg)\nlub umieść binaria w /usr/bin albo /usr/local/bin."
+	return tr("missing_tools")
 }

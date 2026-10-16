@@ -6,8 +6,7 @@ A small desktop GUI for re-encoding videos with ffmpeg, for Linux and Windows. P
 - **Audio, subtitles, container metadata and chapters** are copied without re-encoding
 - **HDR10** (PQ) aware: colour tags and mastering-display / MaxCLL metadata are carried over
 - One Go codebase with a native webview: WebKitGTK on Linux, WebView2 on Windows
-
-> The user interface is currently in Polish. The labels quoted below are followed by their English meaning.
+- English and Polish user interface, switchable in the window
 
 **Downloads:** prebuilt `.deb` (Debian / Ubuntu, amd64) and `enkoder.exe` (Windows, amd64) are attached to each [GitHub Release](https://github.com/jm23-23/Enkoder/releases).
 
@@ -76,14 +75,18 @@ Pushing a tag `v*` (for example `v0.5.0`) runs [the release workflow](.github/wo
 ## Usage
 
 1. Run `./enkoder` (or `enkoder.exe`).
-2. **Przeglądaj…** (Browse) — choose a video. Enkoder reads its tracks and suggests an output name and a CQ/CRF value based on the resolution.
-3. In the **Ścieżki** (Tracks) section keep what should end up in the output. The video track is selected automatically, and so is the default (or first) audio track.
+2. **Browse…** — choose a video. Enkoder reads its tracks and suggests an output name and a CQ/CRF value based on the resolution.
+3. In the **Tracks** section keep what should end up in the output. The video track is selected automatically, and so is the default (or first) audio track.
 4. Set the codec, container, resolution and quality options (preset, tune, bit depth, HDR, deinterlace).
-5. **Zapisz jako…** (Save as) — if you want a different location or name than the suggested one. The output field can also be edited by hand.
-6. **Pokaż komendę** (Show command) — preview the ffmpeg command without starting the encode.
-7. **Koduj** (Encode) — start. **Anuluj** (Cancel) stops a running encode.
+5. **Save as…** — if you want a different location or name than the suggested one. The output field can also be edited by hand.
+6. **Show command** — preview the ffmpeg command without starting the encode.
+7. **Encode** — start. **Cancel** stops a running encode.
 
-The **Pomoc** (Help) button in the window repeats these rules in short.
+The **Help** button in the window repeats these rules in short.
+
+### Language
+
+The **PL / EN** switch in the top right changes the language of the window, the file dialogs and the error messages. The choice is saved in `settings.json` in the user config directory (`~/.config/enkoder/` on Linux, `%AppData%\enkoder\` on Windows). On first start Enkoder follows the system language: Polish for a Polish locale, English otherwise.
 
 At least one video track must be selected. A second encode will not start until the first one finishes or is cancelled.
 
@@ -94,7 +97,7 @@ At least one video track must be selected. A second encode will not start until 
 | **HEVC NVENC (NVIDIA)** | Fast encoding on the GPU. Default when ffmpeg has the `hevc_nvenc` encoder. |
 | **x265 / libx265 (CPU)** | Slower, usually better quality per size. Default without NVENC. |
 | **AV1 / SVT-AV1 (CPU)** | About 3× faster than x265 `slow` and 15–35% smaller files at similar quality. Always 10-bit. Older TVs may not play AV1. Available when ffmpeg has `libsvtav1`. |
-| **Kopiuj video** (Copy video) | Remux the video into a new container without re-encoding. Not available with scaling or deinterlacing. |
+| **Copy video** | Remux the video into a new container without re-encoding. Not available with scaling or deinterlacing. |
 
 ### Container
 
@@ -103,7 +106,7 @@ At least one video track must be selected. A second encode will not start until 
 
 ### Resolution
 
-**Bez zmian** (Unchanged) keeps the source frame size. **Max 2160p / 1080p / 720p / 480p** only scales down (4K can go to Full HD), keeps the aspect ratio and never upscales smaller sources. Scaling needs NVENC, libx265 or SVT-AV1.
+**Unchanged** keeps the source frame size. **Max 2160p / 1080p / 720p / 480p** only scales down (4K can go to Full HD), keeps the aspect ratio and never upscales smaller sources. Scaling needs NVENC, libx265 or SVT-AV1.
 
 ### Quality (CQ / CRF)
 
@@ -117,7 +120,7 @@ After a file is loaded, the suggested CRF is:
 | HD / FHD | 18 |
 | UHD (≥ 3000) | 20 |
 
-It applies to NVENC (CQ) and x265 (CRF); with **Kopiuj video** it is ignored.
+It applies to NVENC (CQ) and x265 (CRF); with **Copy video** it is ignored.
 
 AV1 has its own CRF scale, **0–63**. The suggestion is 3 lower than for x265 (SD 14, HD/FHD 15, UHD 17). Measured on a 1080p Blu-ray: x265 `slow` CRF 18 gives SSIM 0.9737; SVT-AV1 preset 5 gives 0.9752 at CRF 14 and 0.9712 at CRF 17 (a 35% smaller file). The default AV1 preset is **5**: preset 4 is 2.6× slower at almost the same size, preset 6 gives 12–19% larger files.
 
@@ -125,16 +128,16 @@ AV1 has its own CRF scale, **0–63**. The suggestion is 3 lower than for x265 (
 
 - **Preset** — slower means better compression at the same CQ/CRF. libx265 defaults to `slow`, NVENC to `p7`.
 - **Tune** (libx265 only): `film` / `animation` / `grain`, or none.
-- **Szybkość** (Speed, libx265 only) — analysis shortcuts added on top of the preset. Measured on a 1080p Blu-ray (i7-11800H, preset `slow`, CRF 18):
+- **Speed** (libx265 only) — analysis shortcuts added on top of the preset. Measured on a 1080p Blu-ray (i7-11800H, preset `slow`, CRF 18):
 
   | Profile | x265-params | Speed | Size |
   | --- | --- | --- | --- |
-  | **Jakość** (Quality) | — | 1× | 100% |
-  | **Zbalansowany** (Balanced, default) | `rect=0:rskip=2:rskip-edge-threshold=2` | ~2–2.4× | ~99% |
-  | **Szybki** (Fast) | as above + `limit-sao=1:me=hex:subme=2:ref=3` | ~2.5–3× | ~101% |
+  | **Quality** | — | 1× | 100% |
+  | **Balanced** (default) | `rect=0:rskip=2:rskip-edge-threshold=2` | ~2–2.4× | ~99% |
+  | **Fast** | as above + `limit-sao=1:me=hex:subme=2:ref=3` | ~2.5–3× | ~101% |
 
   On top of that, automatically: `asm=avx512` on CPUs with AVX-512 (x265 does not enable it by default, ~10%), and decoding the source on an NVIDIA GPU (`-hwaccel cuda`) so the CPU only encodes.
-- **Głębia bitowa** (Bit depth) — **Auto** picks 10-bit (`yuv420p10le`) for HDR or sources above 8-bit, otherwise 8-bit. NVENC maps 10-bit to `p010le`.
+- **Bit depth** — **Auto** picks 10-bit (`yuv420p10le`) for HDR or sources above 8-bit, otherwise 8-bit. NVENC maps 10-bit to `p010le`.
 - **HDR (PQ)** — for libx265 adds `x265-params` with `hdr-opt` and BT.2020/SMPTE 2084; for NVENC and AV1 copies the colour tags. A Dolby Vision layer does not survive this pipeline.
 - **HDR10 metadata** (mastering display, MaxCLL/MaxFALL) is read from the first frame of the source. ffmpeg ≥ 7.1 carries it over by itself; for x265 and AV1 Enkoder also passes it explicitly (`master-display` / `mastering-display`) so it works with older ffmpeg. When the source metadata is clearly broken (for example primaries with x = y) or the source has dynamic HDR10+, which these encoders do not carry over, Enkoder shows a warning.
 - **Deinterlace (bwdif)** — checked automatically for interlaced sources.
@@ -157,7 +160,7 @@ In the log, `elapsed=` is the real time spent and `speed=` how many times faster
 
 ## What ffmpeg does
 
-A summary of what **Pokaż komendę** shows:
+A summary of what **Show command** shows:
 
 - video: `hevc_nvenc` (preset from the UI, VBR, CQ, AQ) or `libx265` (preset, CRF, `-pix_fmt`, optionally `-x265-params`); without filters NVENC also gets `-hwaccel cuda`, and libx265 always does when CUDA works
 - NVENC: if the GPU supports it (checked with a short test at startup; Pascal has no B-frames in HEVC), also `-tune hq -rc-lookahead 32 -bf 4 -b_ref_mode middle -multipass fullres`; 10-bit goes as `-profile:v main10`

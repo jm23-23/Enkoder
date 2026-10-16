@@ -27,8 +27,8 @@ type HDR10Info struct {
 	// HDR10Plus is true when SMPTE 2094-40 dynamic metadata is present;
 	// the encoders here do not carry it over.
 	HDR10Plus bool
-	// Problem describes mastering display values that cannot be right
-	// (e.g. degenerate primaries). Empty when the data looks sane.
+	// Problem is a Problem* code for mastering display values that cannot be
+	// right (e.g. degenerate primaries). Empty when the data looks sane.
 	Problem string
 }
 
@@ -133,20 +133,27 @@ func applyMasteringDisplay(info *HDR10Info, sd sideData) {
 		c(gx), c(gy), c(bx), c(by), c(rx), c(ry), c(wx), c(wy), l(maxL), l(minL))
 }
 
+// Problem codes for broken mastering display metadata; the UI translates them.
+const (
+	ProblemPrimariesRange      = "primaries_range"
+	ProblemPrimariesDegenerate = "primaries_degenerate"
+	ProblemLuminance           = "luminance"
+)
+
 // masteringProblem rejects values no real display has. BT.709, P3 and
 // BT.2020 gamuts all span a CIE xy triangle area of at least ~0.11.
 func masteringProblem(gx, gy, bx, by, rx, ry, wx, wy, maxL, minL float64) string {
 	for _, v := range []float64{gx, gy, bx, by, rx, ry, wx, wy} {
 		if v <= 0 || v >= 1 {
-			return "współrzędne barw poza zakresem"
+			return ProblemPrimariesRange
 		}
 	}
 	area := math.Abs((gx-rx)*(by-ry)-(bx-rx)*(gy-ry)) / 2
 	if area < 0.05 {
-		return "zdegenerowane barwy podstawowe (np. x = y)"
+		return ProblemPrimariesDegenerate
 	}
 	if maxL <= 0 || maxL > 10000 || minL < 0 || minL >= maxL {
-		return "nieprawidłowa luminancja"
+		return ProblemLuminance
 	}
 	return ""
 }
