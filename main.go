@@ -380,6 +380,7 @@ func (a *app) encode(job jobDTO) error {
 			dur           = duration
 			lastEmit      time.Time
 			progressEvery = 120 * time.Millisecond
+			pos           ffmpeg.PositionTracker
 		)
 
 		runErr := ffmpeg.Run(ctx, a.ffmpegPath, opt, ffmpeg.RunOptions{
@@ -398,7 +399,7 @@ func (a *app) encode(job jobDTO) error {
 				curDur := dur
 				durMu.Unlock()
 
-				if sec, ok := ffmpeg.ParseStatsTime(line); ok {
+				if sec, ok := pos.Position(line); ok {
 					pct := ffmpeg.ProgressPercent(sec, curDur)
 					now := time.Now()
 					durMu.Lock()
