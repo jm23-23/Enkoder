@@ -222,6 +222,36 @@ func runProbe(ffmpegPath string, args ...string) bool {
 	return cmd.Run() == nil
 }
 
+// ToolVersion returns the version from the first line of "<tool> -version"
+// (for example "8.0.1-3ubuntu2"), or "" when it cannot be read.
+func ToolVersion(path string) string {
+	if strings.TrimSpace(path) == "" {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, path, "-hide_banner", "-version")
+	procattr.HideConsole(cmd)
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return ParseVersionLine(string(out))
+}
+
+// ParseVersionLine reads the version from "ffmpeg version 8.0.1 Copyright ...".
+func ParseVersionLine(out string) string {
+	line, _, _ := strings.Cut(out, "\n")
+	_, rest, ok := strings.Cut(line, " version ")
+	if !ok {
+		return ""
+	}
+	if f := strings.Fields(rest); len(f) > 0 {
+		return f[0]
+	}
+	return ""
+}
+
 // SuggestedAV1CRF is the SVT-AV1 CRF that roughly matches SuggestedCRF's
 // x265 quality (AV1 CRF runs 0–63, so the numbers differ).
 func SuggestedAV1CRF(width, height int) int {
@@ -574,6 +604,94 @@ func ProgressPercent(current, duration float64) float64 {
 		return 100
 	}
 	return pct
+}
+
+// PositionTracker turns ffmpeg stderr lines into a playback position.
+// Some ffmpeg builds print time=N/A in the stats line (seen with HDR
+// sources and copied subtitle tracks); then the position is frame= divided
+// by the frame rate of the output video stream, taken from the banner.
+// The output rate matters: bwdif in send_field mode doubles the frame count.
+type PositionTracker struct {
+	inOutput bool
+	inFPS    float64
+	outFPS   float64
+}
+
+// Position updates the tracker with one line and returns the position in
+// seconds when the line is a stats line.
+func (p *PositionTracker) Position(line string) (sec float64, ok bool) {
+	if strings.HasPrefix(strings.TrimSpace(line), "Output #") {
+		p.inOutput = true
+		return 0, false
+	}
+	if fps, ok := parseVideoStreamFPS(line); ok {
+		if p.inOutput {
+			if p.outFPS == 0 {
+				p.outFPS = fps
+			}
+		} else if p.inFPS == 0 {
+			p.inFPS = fps
+		}
+		return 0, false
+	}
+	if sec, ok := ParseStatsTime(line); ok {
+		return sec, true
+	}
+	frames, ok := parseStatsFrame(line)
+	if !ok {
+		return 0, false
+	}
+	fps := p.outFPS
+	if fps <= 0 {
+		fps = p.inFPS
+	}
+	if fps <= 0 {
+		return 0, false
+	}
+	return float64(frames) / fps, true
+}
+
+// parseStatsFrame reads frame= from a stats line ("frame= 3394 fps= 32 ...").
+func parseStatsFrame(line string) (int, bool) {
+	if !strings.Contains(line, "time=") && !strings.Contains(line, "speed=") {
+		return 0, false
+	}
+	i := strings.Index(line, "frame=")
+	if i < 0 {
+		return 0, false
+	}
+	rest := strings.TrimLeft(line[i+len("frame="):], " ")
+	end := 0
+	for end < len(rest) && rest[end] >= '0' && rest[end] <= '9' {
+		end++
+	}
+	n, err := strconv.Atoi(rest[:end])
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// parseVideoStreamFPS reads "23.98 fps" from a banner line such as
+// "Stream #0:0: Video: hevc ..., 23.98 fps, 23.98 tbr, 1k tbn".
+// Cover art (attached pic) is skipped.
+func parseVideoStreamFPS(line string) (float64, bool) {
+	if !strings.Contains(line, "Stream #") || !strings.Contains(line, "Video:") ||
+		strings.Contains(line, "attached pic") {
+		return 0, false
+	}
+	for _, field := range strings.Split(line, ",") {
+		f := strings.TrimSpace(field)
+		if !strings.HasSuffix(f, " fps") {
+			continue
+		}
+		v, err := strconv.ParseFloat(strings.TrimSuffix(f, " fps"), 64)
+		if err != nil || v <= 0 || !isFinite(v) {
+			return 0, false
+		}
+		return v, true
+	}
+	return 0, false
 }
 
 func parseHMSField(line, key string) (sec float64, ok bool) {

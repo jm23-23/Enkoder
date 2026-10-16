@@ -277,6 +277,24 @@
     .modal .modal-actions {
       display: flex; justify-content: flex-end; margin-top: 16px; gap: 8px;
     }
+    .topbar h1 .version { cursor: pointer; }
+    .topbar h1 .version:hover { color: var(--text); text-decoration: underline; }
+    .about-head { display: flex; gap: 14px; align-items: center; margin-bottom: 10px; }
+    .about-head svg { width: 56px; height: 56px; flex: none; }
+    .about-head h2 { margin: 0 0 4px; }
+    .about-head p { margin: 0; color: var(--muted); }
+    .about-links { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 4px 0 2px; font-size: 13px; }
+    .about-links a { color: var(--accent); text-decoration: none; }
+    .about-links a:hover { text-decoration: underline; }
+    .about-env {
+      display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px;
+      margin: 0; font-size: 13px;
+    }
+    .about-env dt { color: var(--muted); }
+    .about-env dd { margin: 0; font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+    .about-env .yes { color: var(--ok); }
+    .about-env .no { color: var(--muted); }
+    #aboutCopied { margin-right: auto; align-self: center; font-size: 12px; color: var(--ok); }
     .modal kbd {
       font: 12px var(--mono); background: #0e1218; border: 1px solid var(--border);
       border-radius: 4px; padding: 1px 5px; color: var(--warn);
@@ -335,13 +353,14 @@
         <rect x="160.0" y="137.0" width="10.0" height="10.0" rx="2" fill="url(#logo-play)" opacity="0.72"/>
         <rect x="174.3" y="123.3" width="9.3" height="9.3" rx="2" fill="url(#logo-play)" opacity="0.63"/>
     </svg>
-    Enkoder <span class="version">{{VERSION}}</span></h1>
+    Enkoder <span class="version" id="versionLink" role="button" tabindex="0" title="O programie" data-i18n-title="about">{{VERSION}}</span></h1>
     <div class="topbar-actions">
       <div class="lang-switch" role="group" aria-label="Language">
         <button type="button" data-set-lang="pl" title="Polski">PL</button>
         <button type="button" data-set-lang="en" title="English">EN</button>
       </div>
       <button id="btnHelp" class="ghost" type="button" data-i18n="help" data-i18n-title="help">Pomoc</button>
+      <button id="btnAbout" class="ghost" type="button" data-i18n="about" data-i18n-title="about">O programie</button>
     </div>
   </div>
   <div class="sysstats" id="sysstats" aria-live="polite" title="Obciążenie systemu" data-i18n-title="sys_load">
@@ -480,6 +499,42 @@
 
       <div class="modal-actions">
         <button id="btnHelpClose" class="primary" type="button" data-i18n="close">Zamknij</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="aboutModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+    <div class="modal">
+      <div class="about-head">
+        <span id="aboutLogo" aria-hidden="true"></span>
+        <div>
+          <h2 id="aboutTitle">Enkoder {{VERSION}}</h2>
+          <p data-i18n="about_desc">Graficzny interfejs do ponownego kodowania wideo przez ffmpeg.</p>
+        </div>
+      </div>
+      <p>© 2026 Janusz Mieszczak · <span data-i18n="about_license">Licencja MIT</span></p>
+      <div class="about-links">
+        <a href="#" data-url="https://github.com/jm23-23/Enkoder">github.com/jm23-23/Enkoder</a>
+        <a href="#" data-url="https://github.com/jm23-23/Enkoder/releases" data-i18n="about_releases">Wydania</a>
+        <a href="#" data-url="https://github.com/jm23-23/Enkoder/issues" data-i18n="about_issues">Zgłoś błąd</a>
+      </div>
+
+      <h3 data-i18n="about_env">Środowisko</h3>
+      <dl class="about-env" id="aboutEnv">
+        <dt data-i18n="about_checking">Sprawdzanie…</dt><dd></dd>
+      </dl>
+
+      <h3 data-i18n="about_components">Użyte komponenty</h3>
+      <ul>
+        <li><strong>webview_go</strong> (Linux), <strong>go-webview2</strong> (Windows), <strong>zenity</strong> — MIT</li>
+        <li data-i18n="about_ffmpeg_note">FFmpeg to osobny program (LGPL/GPL) — Enkoder go nie dołącza, tylko uruchamia.</li>
+      </ul>
+
+      <div class="modal-actions">
+        <span id="aboutCopied" aria-live="polite"></span>
+        <button id="btnAboutCopy" class="ghost" type="button" disabled
+          data-i18n="about_copy" data-i18n-title="about_copy_hint">Kopiuj informacje</button>
+        <button id="btnAboutClose" class="primary" type="button" data-i18n="close">Zamknij</button>
       </div>
     </div>
   </div>
@@ -641,6 +696,24 @@
     const I18N = {
       pl: {
         help: "Pomoc",
+        about: "O programie",
+        about_desc: "Graficzny interfejs do ponownego kodowania wideo przez ffmpeg — NVENC, x265 i SVT-AV1, z zachowaniem HDR10.",
+        about_license: "licencja MIT",
+        about_releases: "Wydania",
+        about_issues: "Zgłoś błąd",
+        about_env: "Środowisko",
+        about_checking: "Sprawdzanie…",
+        about_components: "Użyte komponenty",
+        about_ffmpeg_note: "FFmpeg to osobny program (LGPL/GPL) — Enkoder go nie dołącza, tylko uruchamia.",
+        about_copy: "Kopiuj informacje",
+        about_copy_hint: "Kopiuje wersję i środowisko do schowka — do wklejenia w zgłoszeniu błędu",
+        about_copied: "Skopiowano do schowka",
+        about_os: "System",
+        about_encoders: "Enkodery",
+        about_cuda: "Dekodowanie CUDA",
+        about_not_found: "nie znaleziono",
+        about_yes: "tak",
+        about_no: "nie",
         close: "Zamknij",
         sys_load: "Obciążenie systemu",
         source: "Plik źródłowy",
@@ -717,6 +790,24 @@
       },
       en: {
         help: "Help",
+        about: "About",
+        about_desc: "A desktop GUI for re-encoding video with ffmpeg — NVENC, x265 and SVT-AV1, keeping HDR10.",
+        about_license: "MIT License",
+        about_releases: "Releases",
+        about_issues: "Report a bug",
+        about_env: "Environment",
+        about_checking: "Checking…",
+        about_components: "Components",
+        about_ffmpeg_note: "FFmpeg is a separate program (LGPL/GPL); Enkoder does not ship it, it only runs it.",
+        about_copy: "Copy info",
+        about_copy_hint: "Copies the version and environment to the clipboard, for a bug report",
+        about_copied: "Copied to clipboard",
+        about_os: "System",
+        about_encoders: "Encoders",
+        about_cuda: "CUDA decoding",
+        about_not_found: "not found",
+        about_yes: "yes",
+        about_no: "no",
         close: "Close",
         sys_load: "System load",
         source: "Source file",
@@ -1430,6 +1521,112 @@
     $("helpModal").onclick = (e) => { if (e.target === $("helpModal")) closeHelp(); };
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && $("helpModal").classList.contains("open")) closeHelp();
+    });
+
+    // About: Go pushes the environment with applyAbout (Eval), because on
+    // Linux Bind promises may never resolve; every call is fire and forget.
+    let aboutInfo = null;
+    let aboutRequested = false;
+    function fireAndForget(fn, ...args) {
+      try {
+        const p = fn && fn(...args);
+        if (p && typeof p.catch === "function") p.catch(() => {});
+      } catch (_) {}
+    }
+    function aboutToolText(ver, path) {
+      if (!path) return t("about_not_found");
+      return (ver || "?") + " — " + path;
+    }
+    function aboutFlag(dd, label, on) {
+      const s = document.createElement("span");
+      s.className = on ? "yes" : "no";
+      s.textContent = label + " " + (on ? "✓" : "✗");
+      dd.append(s, " ");
+    }
+    function renderAbout() {
+      const env = $("aboutEnv");
+      if (!aboutInfo) return;
+      env.replaceChildren();
+      const row = (key, fill) => {
+        const dt = document.createElement("dt");
+        const dd = document.createElement("dd");
+        setT(dt, key);
+        fill(dd);
+        env.append(dt, dd);
+      };
+      const a = aboutInfo;
+      row("about_os", (dd) => { dd.textContent = a.os; });
+      const tool = (dd, ver, path) => {
+        if (path) dd.textContent = aboutToolText(ver, path);
+        else setT(dd, "about_not_found");
+      };
+      env.append(Object.assign(document.createElement("dt"), { textContent: "ffmpeg" }));
+      const ff = document.createElement("dd"); tool(ff, a.ffmpegVersion, a.ffmpegPath); env.append(ff);
+      env.append(Object.assign(document.createElement("dt"), { textContent: "ffprobe" }));
+      const fp = document.createElement("dd"); tool(fp, a.ffprobeVersion, a.ffprobePath); env.append(fp);
+      row("about_encoders", (dd) => {
+        aboutFlag(dd, "hevc_nvenc", a.nvenc);
+        if (a.nvenc) aboutFlag(dd, "NVENC hq", a.nvencTuned);
+        aboutFlag(dd, "libsvtav1", a.svtav1);
+      });
+      row("about_cuda", (dd) => { setT(dd, a.cuda ? "about_yes" : "about_no"); });
+      env.append(Object.assign(document.createElement("dt"), { textContent: "AVX-512" }));
+      const av = document.createElement("dd"); setT(av, a.avx512 ? "about_yes" : "about_no"); env.append(av);
+      $("btnAboutCopy").disabled = false;
+    }
+    window.applyAbout = function (info) {
+      aboutInfo = info;
+      renderAbout();
+    };
+    // aboutReport is always English, so it can go straight into an issue.
+    function aboutReport() {
+      const a = aboutInfo || {};
+      const yn = (v) => (v ? "yes" : "no");
+      const tool = (v, p) => (p ? (v || "?") + " (" + p + ")" : "not found");
+      return [
+        "Enkoder " + (a.version || "{{VERSION}}"),
+        "OS: " + (a.os || "?"),
+        "ffmpeg: " + tool(a.ffmpegVersion, a.ffmpegPath),
+        "ffprobe: " + tool(a.ffprobeVersion, a.ffprobePath),
+        "hevc_nvenc: " + yn(a.nvenc) + (a.nvenc ? " (hq: " + yn(a.nvencTuned) + ")" : ""),
+        "CUDA decoding: " + yn(a.cuda),
+        "libsvtav1: " + yn(a.svtav1),
+        "AVX-512: " + yn(a.avx512),
+        "UI language: " + uiLang,
+      ].join("\n");
+    }
+    function openAbout() {
+      if (!$("aboutLogo").firstChild) {
+        const logo = document.querySelector(".topbar .logo");
+        if (logo) $("aboutLogo").append(logo.cloneNode(true));
+      }
+      $("aboutCopied").textContent = "";
+      $("aboutModal").classList.add("open");
+      if (!aboutRequested) {
+        aboutRequested = true;
+        fireAndForget(window.enkoder.about);
+      }
+    }
+    function closeAbout() { $("aboutModal").classList.remove("open"); }
+    $("btnAbout").onclick = openAbout;
+    $("versionLink").onclick = openAbout;
+    $("versionLink").onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAbout(); }
+    };
+    $("btnAboutClose").onclick = closeAbout;
+    $("aboutModal").onclick = (e) => { if (e.target === $("aboutModal")) closeAbout(); };
+    document.querySelectorAll("#aboutModal [data-url]").forEach((el) => {
+      el.onclick = (e) => {
+        e.preventDefault();
+        fireAndForget(window.enkoder.openURL, el.dataset.url);
+      };
+    });
+    $("btnAboutCopy").onclick = () => {
+      fireAndForget(window.enkoder.copyText, aboutReport());
+      setT($("aboutCopied"), "about_copied");
+    };
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && $("aboutModal").classList.contains("open")) closeAbout();
     });
 
     window.addEventListener("enkoder-input-picked", (e) => { usePickedInput(e.detail); });

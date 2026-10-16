@@ -161,6 +161,9 @@ func (a *app) bind() {
 	must(a.view.Bind("capabilities", a.capabilities))
 	must(a.view.Bind("systemStats", a.systemStats))
 	must(a.view.Bind("setLanguage", a.setLanguage))
+	must(a.view.Bind("about", a.about))
+	must(a.view.Bind("openURL", a.openURL))
+	must(a.view.Bind("copyText", a.copyText))
 
 	// Bridge: HTML expects window.enkoder.*; Go Bind exposes top-level functions.
 	a.view.Init(`
@@ -176,6 +179,9 @@ func (a *app) bind() {
     capabilities: function () { return window.capabilities.apply(null, arguments); },
     systemStats: function () { return window.systemStats.apply(null, arguments); },
     setLanguage: function () { return window.setLanguage.apply(null, arguments); },
+    about: function () { return window.about.apply(null, arguments); },
+    openURL: function () { return window.openURL.apply(null, arguments); },
+    copyText: function () { return window.copyText.apply(null, arguments); },
     onLog: function (cb) {
       if (typeof cb !== "function") return;
       window.addEventListener("enkoder-log", function (e) { cb(e.detail); });
@@ -380,6 +386,7 @@ func (a *app) encode(job jobDTO) error {
 			dur           = duration
 			lastEmit      time.Time
 			progressEvery = 120 * time.Millisecond
+			pos           ffmpeg.PositionTracker
 		)
 
 		runErr := ffmpeg.Run(ctx, a.ffmpegPath, opt, ffmpeg.RunOptions{
@@ -398,7 +405,7 @@ func (a *app) encode(job jobDTO) error {
 				curDur := dur
 				durMu.Unlock()
 
-				if sec, ok := ffmpeg.ParseStatsTime(line); ok {
+				if sec, ok := pos.Position(line); ok {
 					pct := ffmpeg.ProgressPercent(sec, curDur)
 					now := time.Now()
 					durMu.Lock()

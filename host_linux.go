@@ -76,6 +76,26 @@ void enkoder_set_icon(void *gtk_window, const unsigned char *png, size_t len) {
 	}
 	unref(loader);
 }
+
+typedef void *(*enkoder_atom_intern_fn)(const char *, int);
+typedef void *(*enkoder_clipboard_get_fn)(void *);
+typedef void (*enkoder_clipboard_set_text_fn)(void *, const char *, int);
+
+// Clipboard text through GTK, looked up the same way. Main thread only.
+int enkoder_set_clipboard(const char *text) {
+	enkoder_atom_intern_fn atom_intern = (enkoder_atom_intern_fn)dlsym(RTLD_DEFAULT, "gdk_atom_intern");
+	enkoder_clipboard_get_fn clipboard_get = (enkoder_clipboard_get_fn)dlsym(RTLD_DEFAULT, "gtk_clipboard_get");
+	enkoder_clipboard_set_text_fn set_text = (enkoder_clipboard_set_text_fn)dlsym(RTLD_DEFAULT, "gtk_clipboard_set_text");
+	if (!atom_intern || !clipboard_get || !set_text || text == NULL) {
+		return 0;
+	}
+	void *cb = clipboard_get(atom_intern("CLIPBOARD", 0));
+	if (cb == NULL) {
+		return 0;
+	}
+	set_text(cb, text, -1);
+	return 1;
+}
 */
 import "C"
 import (
@@ -108,6 +128,15 @@ func (h linuxHost) Eval(js string) {
 	cjs := C.CString(js)
 	defer C.free(unsafe.Pointer(cjs))
 	C.enkoder_eval(h.Window(), cjs)
+}
+
+func setClipboard(text string) error {
+	ct := C.CString(text)
+	defer C.free(unsafe.Pointer(ct))
+	if C.enkoder_set_clipboard(ct) == 0 {
+		return errors.New("clipboard not available")
+	}
+	return nil
 }
 
 func newHost() (webviewHost, error) {

@@ -1,6 +1,7 @@
 package ffmpeg
 
 import (
+	"math"
 	"os"
 	"os/exec"
 	"runtime"
@@ -470,6 +471,56 @@ func TestCUDAVideoFilterVariants(t *testing.T) {
 	for _, c := range cases {
 		if got := cudaVideoFilter(c.opt); got != c.want {
 			t.Errorf("cudaVideoFilter(%+v) = %q, want %q", c.opt, got, c.want)
+		}
+	}
+}
+
+func TestPositionTrackerFallsBackToFrames(t *testing.T) {
+	var p PositionTracker
+	lines := []string{
+		"  Stream #0:0(eng): Video: hevc (Main 10), yuv420p10le(tv, bt2020nc/bt2020/smpte2084), 3840x2160, SAR 1:1 DAR 16:9, 23.98 fps, 23.98 tbr, 1k tbn (default)",
+		"  Stream #0:5: Video: mjpeg (Baseline), yuvj420p, 600x900, 90k tbr, 90k tbn (attached pic)",
+		"Output #0, matroska, to 'out.mkv':",
+		"  Stream #0:0(eng): Video: hevc (Main 10), p010le(tv, bt2020nc/bt2020/smpte2084, progressive), 3840x2160, q=2-31, 47.95 fps, 1k tbn (default)",
+	}
+	for _, l := range lines {
+		if _, ok := p.Position(l); ok {
+			t.Fatalf("banner line reported a position: %q", l)
+		}
+	}
+	sec, ok := p.Position("frame= 3473 fps= 32 q=22.0 q=0.0 size=  283648KiB time=N/A bitrate=N/A speed=N/A elapsed=0:01:47.52")
+	if !ok || math.Abs(sec-3473/47.95) > 1e-9 {
+		t.Fatalf("got %v %v, want %v from the output fps", sec, ok, 3473/47.95)
+	}
+	sec, ok = p.Position("frame=  100 fps= 32 q=22.0 size=  1024KiB time=00:00:04.17 bitrate=1.0kbits/s speed=1.3x")
+	if !ok || math.Abs(sec-4.17) > 1e-9 {
+		t.Fatalf("time= should win: got %v %v", sec, ok)
+	}
+}
+
+func TestPositionTrackerUsesInputFPSWithoutOutputRate(t *testing.T) {
+	var p PositionTracker
+	p.Position("  Stream #0:0: Video: h264 (High), yuv420p, 1920x1080, 25 fps, 25 tbr, 1k tbn")
+	p.Position("Output #0, matroska, to 'out.mkv':")
+	sec, ok := p.Position("frame=  250 fps=50 q=-1.0 size=  1KiB time=N/A bitrate=N/A speed=N/A")
+	if !ok || sec != 10 {
+		t.Fatalf("got %v %v, want 10", sec, ok)
+	}
+	if _, ok := p.Position("frame=  250 something else"); ok {
+		t.Fatal("non-stats line must not report a position")
+	}
+}
+
+func TestParseVersionLine(t *testing.T) {
+	cases := map[string]string{
+		"ffmpeg version 8.0.1-3ubuntu2+esm5 Copyright (c) 2000-2025 the FFmpeg developers\nbuilt with gcc": "8.0.1-3ubuntu2+esm5",
+		"ffprobe version n7.1 Copyright (c) 2007-2024\r\n":                                                 "n7.1",
+		"something else": "",
+		"":               "",
+	}
+	for in, want := range cases {
+		if got := strings.TrimSpace(ParseVersionLine(in)); got != want {
+			t.Errorf("ParseVersionLine(%q) = %q, want %q", in, got, want)
 		}
 	}
 }
