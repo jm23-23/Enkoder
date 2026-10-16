@@ -88,7 +88,6 @@ type capsDTO struct {
 	NVENC        bool   `json:"nvenc"`
 	SVTAV1       bool   `json:"svtav1"`
 	DefaultCodec string `json:"defaultCodec"`
-	Message      string `json:"message"`
 }
 
 type jobDTO struct {
@@ -117,6 +116,7 @@ type jobDTO struct {
 }
 
 func main() {
+	initLang()
 	ffmpegPath := findTool("ffmpeg")
 	ffprobePath := findTool("ffprobe")
 	if ffmpegPath == "" || ffprobePath == "" {
@@ -160,6 +160,7 @@ func (a *app) bind() {
 	must(a.view.Bind("cancel", a.cancelEncode))
 	must(a.view.Bind("capabilities", a.capabilities))
 	must(a.view.Bind("systemStats", a.systemStats))
+	must(a.view.Bind("setLanguage", a.setLanguage))
 
 	// Bridge: HTML expects window.enkoder.*; Go Bind exposes top-level functions.
 	a.view.Init(`
@@ -174,6 +175,7 @@ func (a *app) bind() {
     cancel: function () { return window.cancel.apply(null, arguments); },
     capabilities: function () { return window.capabilities.apply(null, arguments); },
     systemStats: function () { return window.systemStats.apply(null, arguments); },
+    setLanguage: function () { return window.setLanguage.apply(null, arguments); },
     onLog: function (cb) {
       if (typeof cb !== "function") return;
       window.addEventListener("enkoder-log", function (e) { cb(e.detail); });
@@ -200,15 +202,10 @@ func hasAVX512() bool {
 }
 
 func (a *app) capabilities() (capsDTO, error) {
-	msg := "Wykryto NVIDIA NVENC — domyślnie hevc_nvenc (CPU libx265 też dostępny)."
-	if !a.nvenc {
-		msg = "Brak hevc_nvenc w ffmpeg — używany kodek CPU libx265. Opcja NVENC jest niedostępna."
-	}
 	return capsDTO{
 		NVENC:        a.nvenc,
 		SVTAV1:       ffmpeg.HasSVTAV1(a.ffmpegPath),
 		DefaultCodec: a.defaultCodec,
-		Message:      msg,
 	}, nil
 }
 
@@ -342,7 +339,7 @@ func (a *app) encode(job jobDTO) error {
 	a.mu.Lock()
 	if a.busy {
 		a.mu.Unlock()
-		return fmt.Errorf("kodowanie już trwa")
+		return errors.New(tr("busy"))
 	}
 	if a.cancel != nil {
 		a.cancel()
@@ -438,9 +435,9 @@ func (a *app) encode(job jobDTO) error {
 		switch {
 		case runErr == nil:
 			a.emitProgress(100, finalDur, finalDur)
-			a.emitEvent("enkoder-done", "Gotowe.")
+			a.emitEvent("enkoder-done", "")
 		case errors.Is(runErr, context.Canceled), errors.Is(runErr, context.DeadlineExceeded):
-			a.emitEvent("enkoder-cancelled", "Anulowano.")
+			a.emitEvent("enkoder-cancelled", "")
 		default:
 			a.emitEvent("enkoder-error", runErr.Error())
 		}
@@ -541,38 +538,38 @@ func (a *app) cancelEncode() {
 
 func (a *app) jobToOptions(j jobDTO) (ffmpeg.Options, error) {
 	if strings.TrimSpace(j.Input) == "" {
-		return ffmpeg.Options{}, fmt.Errorf("brak pliku źródłowego")
+		return ffmpeg.Options{}, errors.New(tr("no_input"))
 	}
 	if strings.TrimSpace(j.Output) == "" {
-		return ffmpeg.Options{}, fmt.Errorf("brak pliku wynikowego")
+		return ffmpeg.Options{}, errors.New(tr("no_output"))
 	}
 	if len(j.Video) == 0 {
-		return ffmpeg.Options{}, fmt.Errorf("wybierz co najmniej jedną ścieżkę video")
+		return ffmpeg.Options{}, errors.New(tr("no_video"))
 	}
 	codec := ffmpeg.VideoCodec(j.Codec)
 	switch codec {
 	case ffmpeg.CodecHEVCNVENC:
 		if !a.nvenc {
-			return ffmpeg.Options{}, fmt.Errorf("hevc_nvenc niedostępny — wybierz libx265 (CPU)")
+			return ffmpeg.Options{}, errors.New(tr("nvenc_missing"))
 		}
 	case ffmpeg.CodecSVTAV1:
 		if !ffmpeg.HasSVTAV1(a.ffmpegPath) {
-			return ffmpeg.Options{}, fmt.Errorf("libsvtav1 niedostępny w tym ffmpeg")
+			return ffmpeg.Options{}, errors.New(tr("svtav1_missing"))
 		}
 	case ffmpeg.CodecLibX265, ffmpeg.CodecCopy:
 	default:
 		codec = ffmpeg.VideoCodec(a.defaultCodec)
 	}
 	if j.ScaleHeight > 0 && codec == ffmpeg.CodecCopy {
-		return ffmpeg.Options{}, fmt.Errorf("zmiana rozdzielczości wymaga ponownego kodowania — wybierz NVENC, libx265 lub SVT-AV1")
+		return ffmpeg.Options{}, errors.New(tr("scale_needs_enc"))
 	}
 	if j.Deinterlace && codec == ffmpeg.CodecCopy {
-		return ffmpeg.Options{}, fmt.Errorf("deinterlace wymaga ponownego kodowania — wybierz NVENC, libx265 lub SVT-AV1")
+		return ffmpeg.Options{}, errors.New(tr("deint_needs_enc"))
 	}
 	switch j.ScaleHeight {
 	case 0, 2160, 1080, 720, 480:
 	default:
-		return ffmpeg.Options{}, fmt.Errorf("nieobsługiwana rozdzielczość: %d", j.ScaleHeight)
+		return ffmpeg.Options{}, errors.New(tr("bad_resolution", j.ScaleHeight))
 	}
 
 	cq := 18
@@ -582,18 +579,18 @@ func (a *app) jobToOptions(j jobDTO) (ffmpeg.Options, error) {
 	}
 	if j.CQ != nil {
 		if *j.CQ < 0 || *j.CQ > maxCQ {
-			return ffmpeg.Options{}, fmt.Errorf("jakość CQ/CRF musi być w zakresie 0–%d", maxCQ)
+			return ffmpeg.Options{}, errors.New(tr("bad_cq", maxCQ))
 		}
 		cq = *j.CQ
 	}
 
 	masterDisplay := strings.TrimSpace(j.MasterDisplay)
 	if masterDisplay != "" && !reMasterDisplay.MatchString(masterDisplay) {
-		return ffmpeg.Options{}, fmt.Errorf("nieprawidłowe metadane mastering display: %s", masterDisplay)
+		return ffmpeg.Options{}, errors.New(tr("bad_master", masterDisplay))
 	}
 	maxCLL := strings.TrimSpace(j.MaxCLL)
 	if maxCLL != "" && !reMaxCLL.MatchString(maxCLL) {
-		return ffmpeg.Options{}, fmt.Errorf("nieprawidłowe metadane MaxCLL: %s", maxCLL)
+		return ffmpeg.Options{}, errors.New(tr("bad_maxcll", maxCLL))
 	}
 
 	preset := strings.TrimSpace(j.Preset)
@@ -608,10 +605,10 @@ func (a *app) jobToOptions(j jobDTO) (ffmpeg.Options, error) {
 	switch tune {
 	case "", "film", "animation", "grain":
 	default:
-		return ffmpeg.Options{}, fmt.Errorf("nieobsługiwany tune: %s", tune)
+		return ffmpeg.Options{}, errors.New(tr("bad_tune", tune))
 	}
 	if tune != "" && codec != ffmpeg.CodecLibX265 {
-		return ffmpeg.Options{}, fmt.Errorf("tune film/animation/grain działa tylko z libx265")
+		return ffmpeg.Options{}, errors.New(tr("tune_x265_only"))
 	}
 
 	speed := ffmpeg.X265Speed(strings.TrimSpace(j.Speed))
@@ -620,7 +617,7 @@ func (a *app) jobToOptions(j jobDTO) (ffmpeg.Options, error) {
 		speed = ffmpeg.SpeedQuality
 	case ffmpeg.SpeedQuality, ffmpeg.SpeedBalanced, ffmpeg.SpeedFast:
 	default:
-		return ffmpeg.Options{}, fmt.Errorf("nieobsługiwany profil szybkości: %s", speed)
+		return ffmpeg.Options{}, errors.New(tr("bad_speed", speed))
 	}
 
 	pixFmt := strings.TrimSpace(j.PixFmt)
@@ -630,7 +627,7 @@ func (a *app) jobToOptions(j jobDTO) (ffmpeg.Options, error) {
 			pixFmt = ""
 		}
 	default:
-		return ffmpeg.Options{}, fmt.Errorf("nieobsługiwany format pikseli: %s", pixFmt)
+		return ffmpeg.Options{}, errors.New(tr("bad_pixfmt", pixFmt))
 	}
 
 	reencode := codec != ffmpeg.CodecCopy
@@ -683,7 +680,7 @@ var (
 )
 
 // canGPUFilter caches ffmpeg.CanGPUFilter per input and filter chain, so
-// "Pokaż komendę" and "Koduj" decode the test frame only once.
+// "Show command" and "Encode" decode the test frame only once.
 func (a *app) canGPUFilter(opt ffmpeg.Options) bool {
 	if !a.nvenc || !ffmpeg.HasCUDA(a.ffmpegPath) {
 		return false
@@ -723,7 +720,7 @@ func validatePreset(codec ffmpeg.VideoCodec, preset string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("nieobsługiwany preset %q dla %s", preset, codec)
+	return errors.New(tr("bad_preset", preset, codec))
 }
 
 func suggestExt(container string) string {

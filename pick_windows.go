@@ -18,10 +18,10 @@ func (a *app) saveOutput(suggested, container string) (string, error) {
 
 func pickOpenFile() (string, error) {
 	path, err := zenity.SelectFile(
-		zenity.Title("Wybierz film"),
+		zenity.Title(tr("pick_open")),
 		zenity.FileFilters{
-			{Name: "Wideo", Patterns: []string{"*.mkv", "*.mp4", "*.avi", "*.mov", "*.m4v", "*.ts", "*.m2ts", "*.webm"}},
-			{Name: "Wszystkie pliki", Patterns: []string{"*.*"}},
+			{Name: tr("filter_video"), Patterns: []string{"*.mkv", "*.mp4", "*.avi", "*.mov", "*.m4v", "*.ts", "*.m2ts", "*.webm"}},
+			{Name: tr("filter_all"), Patterns: []string{"*.*"}},
 		},
 	)
 	if err == zenity.ErrCanceled {
@@ -32,11 +32,11 @@ func pickOpenFile() (string, error) {
 
 func pickSaveFile(filename, ext string) (string, error) {
 	path, err := zenity.SelectFileSave(
-		zenity.Title("Zapisz jako"),
+		zenity.Title(tr("pick_save")),
 		zenity.Filename(filename),
 		zenity.FileFilters{
 			{Name: strings.ToUpper(ext) + " (*." + ext + ")", Patterns: []string{"*." + ext}},
-			{Name: "Wszystkie pliki", Patterns: []string{"*.*"}},
+			{Name: tr("filter_all"), Patterns: []string{"*.*"}},
 		},
 		zenity.ConfirmOverwrite(),
 	)

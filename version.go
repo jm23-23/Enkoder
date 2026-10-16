@@ -10,7 +10,7 @@ func appTitle() string {
 	return "Enkoder " + version
 }
 
-// uiHTML fills the {{VERSION}} placeholders in the embedded page.
+// uiHTML fills the {{VERSION}} and {{LANG}} placeholders in the embedded page.
 func uiHTML() string {
-	return strings.ReplaceAll(indexHTML, "{{VERSION}}", version)
+	return strings.NewReplacer("{{VERSION}}", version, "{{LANG}}", lang()).Replace(indexHTML)
 }
