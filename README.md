@@ -43,10 +43,10 @@ make
 ```bash
 sudo apt install dpkg-dev   # once, for dpkg-shlibdeps
 make deb
-sudo apt install ./dist/enkoder_0.6.0_amd64.deb
+sudo apt install ./dist/enkoder_0.6.1_amd64.deb
 ```
 
-The package installs `/usr/bin/enkoder`, the icon and an application menu entry; apt pulls in ffmpeg, zenity and the GTK/WebKit libraries (library dependencies are computed by `dpkg-shlibdeps` from the built binary). The version comes from `version.go`; override it with `VERSION=0.6.1 make deb`. Remove it with `sudo apt remove enkoder`.
+The package installs `/usr/bin/enkoder`, the icon and an application menu entry; apt pulls in ffmpeg, zenity and the GTK/WebKit libraries (library dependencies are computed by `dpkg-shlibdeps` from the built binary). The version comes from `version.go`; override it with `VERSION=0.6.2 make deb`. Remove it with `sudo apt remove enkoder`.
 
 If you used `make install` before, run `make uninstall` first: the entry in `~/.local` shadows the one from the package.
 
@@ -70,7 +70,7 @@ The source is `assets/icon.svg` (a player breaking up into macroblocks on a film
 
 ### Releases
 
-Pushing a tag `v*` (for example `v0.6.0`) runs [the release workflow](.github/workflows/release.yml), which builds the `.deb` and `enkoder.exe` and attaches them to a GitHub Release. The version is taken from the tag.
+Pushing a tag `v*` (for example `v0.6.1`) runs [the release workflow](.github/workflows/release.yml), which builds the `.deb` and `enkoder.exe` and attaches them to a GitHub Release. The version is taken from the tag.
 
 ## Usage
 
