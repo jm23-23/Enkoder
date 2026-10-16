@@ -510,3 +510,17 @@ func TestPositionTrackerUsesInputFPSWithoutOutputRate(t *testing.T) {
 		t.Fatal("non-stats line must not report a position")
 	}
 }
+
+func TestParseVersionLine(t *testing.T) {
+	cases := map[string]string{
+		"ffmpeg version 8.0.1-3ubuntu2+esm5 Copyright (c) 2000-2025 the FFmpeg developers\nbuilt with gcc": "8.0.1-3ubuntu2+esm5",
+		"ffprobe version n7.1 Copyright (c) 2007-2024\r\n":                                                 "n7.1",
+		"something else": "",
+		"":               "",
+	}
+	for in, want := range cases {
+		if got := strings.TrimSpace(ParseVersionLine(in)); got != want {
+			t.Errorf("ParseVersionLine(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

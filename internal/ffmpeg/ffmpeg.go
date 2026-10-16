@@ -222,6 +222,36 @@ func runProbe(ffmpegPath string, args ...string) bool {
 	return cmd.Run() == nil
 }
 
+// ToolVersion returns the version from the first line of "<tool> -version"
+// (for example "8.0.1-3ubuntu2"), or "" when it cannot be read.
+func ToolVersion(path string) string {
+	if strings.TrimSpace(path) == "" {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, path, "-hide_banner", "-version")
+	procattr.HideConsole(cmd)
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return ParseVersionLine(string(out))
+}
+
+// ParseVersionLine reads the version from "ffmpeg version 8.0.1 Copyright ...".
+func ParseVersionLine(out string) string {
+	line, _, _ := strings.Cut(out, "\n")
+	_, rest, ok := strings.Cut(line, " version ")
+	if !ok {
+		return ""
+	}
+	if f := strings.Fields(rest); len(f) > 0 {
+		return f[0]
+	}
+	return ""
+}
+
 // SuggestedAV1CRF is the SVT-AV1 CRF that roughly matches SuggestedCRF's
 // x265 quality (AV1 CRF runs 0–63, so the numbers differ).
 func SuggestedAV1CRF(width, height int) int {

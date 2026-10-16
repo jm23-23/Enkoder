@@ -84,6 +84,8 @@ Pushing a tag `v*` (for example `v0.6.0`) runs [the release workflow](.github/wo
 
 The **Help** button in the window repeats these rules in short.
 
+**About** (or a click on the version number) shows the version, the licence, links to the project and the detected environment: ffmpeg / ffprobe versions and paths, NVENC, CUDA, SVT-AV1 and AVX-512. **Copy info** puts that on the clipboard in English, ready to paste into a bug report.
+
 ### Language
 
 The **PL / EN** switch in the top right changes the language of the window, the file dialogs and the error messages. The choice is saved in `settings.json` in the user config directory (`~/.config/enkoder/` on Linux, `%AppData%\enkoder\` on Windows). On first start Enkoder follows the system language: Polish for a Polish locale, English otherwise.
