@@ -30,6 +30,7 @@ type aboutDTO struct {
 	CUDA           bool   `json:"cuda"`
 	SVTAV1         bool   `json:"svtav1"`
 	AVX512         bool   `json:"avx512"`
+	QualityMetric  string `json:"qualityMetric"`
 }
 
 var (
@@ -53,6 +54,7 @@ func (a *app) aboutData() aboutDTO {
 			CUDA:           a.nvenc && ffmpeg.HasCUDA(a.ffmpegPath),
 			SVTAV1:         ffmpeg.HasSVTAV1(a.ffmpegPath),
 			AVX512:         hasAVX512(),
+			QualityMetric:  string(a.qualityMetric()),
 		}
 	})
 	return aboutInfo

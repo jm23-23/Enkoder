@@ -385,6 +385,17 @@ func videoFilter(opt Options) string {
 	return strings.Join(parts, ",")
 }
 
+// ReferenceFilter is the CPU filter chain (deinterlace, downscale) an
+// encode of opt applies, so a quality metric can compare the encode with
+// a source that went through the same geometry. Empty if none.
+func ReferenceFilter(opt Options) string {
+	opt.GPUFilters = false
+	if opt.VideoCodec == CodecCopy {
+		return ""
+	}
+	return videoFilter(opt)
+}
+
 // cudaVideoFilter mirrors videoFilter on CUDA frames. bwdif_cuda defaults to
 // send_frame, unlike bwdif, so the mode is pinned to keep 25i -> 50p. The
 // pixel format conversion happens in scale_cuda because NVENC cannot
