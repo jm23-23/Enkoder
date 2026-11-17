@@ -31,6 +31,9 @@ var indexHTML string
 type app struct {
 	ffmpegPath   string
 	ffprobePath  string
+	toolSource   string // toolSourceSetting / Env / Auto
+	toolProblem  string // why the configured path was skipped, or ""
+	startSetting string // the ffmpeg path setting this process started with
 	nvenc        bool
 	defaultCodec string
 	view         webviewHost
@@ -134,10 +137,11 @@ type jobDTO struct {
 
 func main() {
 	initLang()
-	ffmpegPath := findTool("ffmpeg")
-	ffprobePath := findTool("ffprobe")
+	saved, _ := loadSettings()
+	tools := resolveTools(saved.FFmpegPath)
+	ffmpegPath, ffprobePath := tools.FFmpeg, tools.FFprobe
 	if ffmpegPath == "" || ffprobePath == "" {
-		zenity.Error(missingToolsMessage(), zenity.Title(appTitle()))
+		zenity.Error(startupToolsError(tools), zenity.Title(appTitle()))
 		os.Exit(1)
 	}
 
@@ -154,6 +158,9 @@ func main() {
 	a := &app{
 		ffmpegPath:   ffmpegPath,
 		ffprobePath:  ffprobePath,
+		toolSource:   tools.Source,
+		toolProblem:  tools.Problem,
+		startSetting: saved.FFmpegPath,
 		nvenc:        nvenc,
 		defaultCodec: defaultCodec,
 		view:         w,
@@ -163,6 +170,12 @@ func main() {
 	w.SetSize(920, 780)
 	w.LoadUI(uiHTML())
 	a.pushInitialCaps()
+	if tools.Problem != "" {
+		go func() {
+			time.Sleep(500 * time.Millisecond) // after the page has loaded
+			a.emitEvent("enkoder-log", tr("ffpath_fallback", tools.Problem, ffmpegPath))
+		}()
+	}
 	a.startStatsPump()
 	w.Run()
 }
@@ -182,6 +195,11 @@ func (a *app) bind() {
 	must(a.view.Bind("about", a.about))
 	must(a.view.Bind("openURL", a.openURL))
 	must(a.view.Bind("copyText", a.copyText))
+	must(a.view.Bind("getFFmpegSettings", a.getFFmpegSettings))
+	must(a.view.Bind("checkFFmpeg", a.checkFFmpeg))
+	must(a.view.Bind("pickFFmpeg", a.pickFFmpeg))
+	must(a.view.Bind("saveFFmpegPath", a.saveFFmpegPath))
+	must(a.view.Bind("restartApp", a.restartApp))
 
 	// Bridge: HTML expects window.enkoder.*; Go Bind exposes top-level functions.
 	a.view.Init(`
@@ -201,6 +219,11 @@ func (a *app) bind() {
     about: function () { return window.about.apply(null, arguments); },
     openURL: function () { return window.openURL.apply(null, arguments); },
     copyText: function () { return window.copyText.apply(null, arguments); },
+    getFFmpegSettings: function () { return window.getFFmpegSettings.apply(null, arguments); },
+    checkFFmpeg: function () { return window.checkFFmpeg.apply(null, arguments); },
+    pickFFmpeg: function () { return window.pickFFmpeg.apply(null, arguments); },
+    saveFFmpegPath: function () { return window.saveFFmpegPath.apply(null, arguments); },
+    restartApp: function () { return window.restartApp.apply(null, arguments); },
     onLog: function (cb) {
       if (typeof cb !== "function") return;
       window.addEventListener("enkoder-log", function (e) { cb(e.detail); });

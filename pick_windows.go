@@ -45,3 +45,18 @@ func pickSaveFile(filename, ext string) (string, error) {
 	}
 	return path, err
 }
+
+// pickExecutable lets the user choose the ffmpeg program.
+func pickExecutable() (string, error) {
+	path, err := zenity.SelectFile(
+		zenity.Title(tr("pick_ffmpeg")),
+		zenity.FileFilters{
+			{Name: "ffmpeg.exe", Patterns: []string{"ffmpeg*.exe"}},
+			{Name: tr("filter_all"), Patterns: []string{"*.*"}},
+		},
+	)
+	if err == zenity.ErrCanceled {
+		return "", nil
+	}
+	return normalizePickedPath(path), err
+}

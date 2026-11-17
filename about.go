@@ -23,6 +23,7 @@ type aboutDTO struct {
 	OS             string `json:"os"`
 	FFmpegPath     string `json:"ffmpegPath"`
 	FFmpegVersion  string `json:"ffmpegVersion"`
+	FFmpegSource   string `json:"ffmpegSource"`
 	FFprobePath    string `json:"ffprobePath"`
 	FFprobeVersion string `json:"ffprobeVersion"`
 	NVENC          bool   `json:"nvenc"`
@@ -47,6 +48,7 @@ func (a *app) aboutData() aboutDTO {
 			OS:             runtime.GOOS + "/" + runtime.GOARCH,
 			FFmpegPath:     a.ffmpegPath,
 			FFmpegVersion:  ffmpeg.ToolVersion(a.ffmpegPath),
+			FFmpegSource:   a.toolSource,
 			FFprobePath:    a.ffprobePath,
 			FFprobeVersion: ffmpeg.ToolVersion(a.ffprobePath),
 			NVENC:          a.nvenc,
