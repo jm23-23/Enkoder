@@ -322,3 +322,35 @@ func TestDefaultSpeedIsBalanced(t *testing.T) {
 		t.Fatalf("explicit quality = %q", opt.Speed)
 	}
 }
+
+func TestFindQualityValidation(t *testing.T) {
+	defer setLang(lang())
+	setLang(langEN)
+	src := filepath.Join(t.TempDir(), "film.mkv")
+	if err := os.WriteFile(src, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	job := jobDTO{Input: src, Output: src + ".out.mkv", Video: []int{0}, Codec: "copy", Container: "mkv", DurationSeconds: 600}
+	a := &app{view: &fakeView{events: make(chan string, 16)}}
+	a.metricOnce.Do(func() { a.metric = "xpsnr" })
+
+	if err := a.findQuality(job, "high"); err == nil || !strings.Contains(err.Error(), "re-encoding") {
+		t.Errorf("copy: %v", err)
+	}
+	job.Codec = "libx265"
+	if err := a.findQuality(job, "superb"); err == nil || !strings.Contains(err.Error(), "superb") {
+		t.Errorf("bad level: %v", err)
+	}
+	a.mu.Lock()
+	a.busy = true
+	a.mu.Unlock()
+	if err := a.findQuality(job, "high"); err == nil || !strings.Contains(err.Error(), "already running") {
+		t.Errorf("busy: %v", err)
+	}
+
+	b := &app{view: a.view}
+	b.metricOnce.Do(func() {}) // no metric
+	if err := b.findQuality(job, "high"); err == nil || !strings.Contains(err.Error(), "quality metric") {
+		t.Errorf("no metric: %v", err)
+	}
+}

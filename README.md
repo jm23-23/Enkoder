@@ -126,6 +126,25 @@ It applies to NVENC (CQ) and x265 (CRF); with **Copy video** it is ignored.
 
 AV1 has its own CRF scale, **0–63**. The suggestion is 3 lower than for x265 (SD 14, HD/FHD 15, UHD 17). Measured on a 1080p Blu-ray: x265 `slow` CRF 18 gives SSIM 0.9737; SVT-AV1 preset 5 gives 0.9752 at CRF 14 and 0.9712 at CRF 17 (a 35% smaller file). The default AV1 preset is **5**: preset 4 is 2.6× slower at almost the same size, preset 6 gives 12–19% larger files.
 
+### Target quality (Find CRF)
+
+Instead of guessing a CRF, pick a target next to **Find CRF** — **Visually lossless**, **High** or **Good** — and click it. Enkoder then:
+
+1. takes 10 s samples from 3–6 places in the film (one more per 20 minutes, skipping the very start and end),
+2. encodes them with the current codec and settings at a candidate CRF / CQ,
+3. compares each with the same piece of the source (deinterlaced / scaled like the encode) using the best metric this ffmpeg has: **VMAF** (needs ffmpeg built with libvmaf), otherwise **XPSNR** (ffmpeg ≥ 7.1) or **SSIM**,
+4. searches for the highest value at which even the **worst** sample meets the target (usually 3–5 values), and puts it in the quality field.
+
+The log shows every value tried with the per-sample scores, and the status line the estimated video size. **Cancel** stops the search. With NVENC it takes 1–3 minutes for a feature film; with x265 `slow` a few percent of the full encode time.
+
+| Target | VMAF | XPSNR | SSIM | max CRF (x265 / NVENC) | max CRF (AV1) |
+| --- | --- | --- | --- | --- | --- |
+| Visually lossless | 97 | 41.5 dB | 0.985 | 20 | 20 |
+| High | 95 | 39.5 dB | 0.975 | 24 | 28 |
+| Good | 93 | 37.5 dB | 0.965 | 28 | 36 |
+
+The XPSNR and SSIM targets were measured on four 1080p films; on grainy Blu-rays they land near CRF 15 / 18 / 21 with x265. Clean, soft sources (typical WEB-DLs) score much higher on these metrics than they look, so each target also has a maximum CRF. VMAF tracks perception better; if your ffmpeg has libvmaf, Enkoder uses it automatically (About shows which metric is in use).
+
 ### Preset, tune, 10-bit, HDR
 
 - **Preset** — slower means better compression at the same CQ/CRF. libx265 defaults to `slow`, NVENC to `p7`.

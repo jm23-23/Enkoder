@@ -18,6 +18,7 @@ import (
 
 	"enkoder/internal/ffmpeg"
 	"enkoder/internal/ffprobe"
+	"enkoder/internal/quality"
 	"enkoder/internal/suggest"
 
 	"github.com/ncruces/zenity"
@@ -41,6 +42,9 @@ type app struct {
 
 	gpuFilterMu    sync.Mutex
 	gpuFilterCache map[string]bool
+
+	metricOnce sync.Once
+	metric     quality.Metric
 }
 
 type streamDTO struct {
@@ -88,6 +92,19 @@ type capsDTO struct {
 	NVENC        bool   `json:"nvenc"`
 	SVTAV1       bool   `json:"svtav1"`
 	DefaultCodec string `json:"defaultCodec"`
+	// QualityMetric is the metric "Find CRF" uses (vmaf, xpsnr, ssim) or "".
+	QualityMetric string `json:"qualityMetric"`
+}
+
+// qualityDTO is the result of a target-quality search, sent to the page.
+type qualityDTO struct {
+	CRF            int     `json:"crf"`
+	Score          float64 `json:"score"`
+	Target         float64 `json:"target"`
+	Metric         string  `json:"metric"`
+	Met            bool    `json:"met"`
+	EstimatedBytes int64   `json:"estimatedBytes"`
+	Trials         int     `json:"trials"`
 }
 
 type jobDTO struct {
@@ -157,6 +174,7 @@ func (a *app) bind() {
 	must(a.view.Bind("suggestName", a.suggestName))
 	must(a.view.Bind("preview", a.preview))
 	must(a.view.Bind("encode", a.encode))
+	must(a.view.Bind("findQuality", a.findQuality))
 	must(a.view.Bind("cancel", a.cancelEncode))
 	must(a.view.Bind("capabilities", a.capabilities))
 	must(a.view.Bind("systemStats", a.systemStats))
@@ -175,6 +193,7 @@ func (a *app) bind() {
     suggestName: function () { return window.suggestName.apply(null, arguments); },
     preview: function () { return window.preview.apply(null, arguments); },
     encode: function () { return window.encode.apply(null, arguments); },
+    findQuality: function () { return window.findQuality.apply(null, arguments); },
     cancel: function () { return window.cancel.apply(null, arguments); },
     capabilities: function () { return window.capabilities.apply(null, arguments); },
     systemStats: function () { return window.systemStats.apply(null, arguments); },
@@ -209,10 +228,19 @@ func hasAVX512() bool {
 
 func (a *app) capabilities() (capsDTO, error) {
 	return capsDTO{
-		NVENC:        a.nvenc,
-		SVTAV1:       ffmpeg.HasSVTAV1(a.ffmpegPath),
-		DefaultCodec: a.defaultCodec,
+		NVENC:         a.nvenc,
+		SVTAV1:        ffmpeg.HasSVTAV1(a.ffmpegPath),
+		DefaultCodec:  a.defaultCodec,
+		QualityMetric: string(a.qualityMetric()),
 	}, nil
+}
+
+// qualityMetric is the best quality metric this ffmpeg has. Cached.
+func (a *app) qualityMetric() quality.Metric {
+	a.metricOnce.Do(func() {
+		a.metric = quality.DetectMetric(a.ffmpegPath)
+	})
+	return a.metric
 }
 
 func (a *app) selectInputFile() (string, error) {
@@ -490,6 +518,138 @@ func (a *app) startEncode(job jobDTO, opt ffmpeg.Options) error {
 	}()
 
 	return nil
+}
+
+// findQuality searches for the highest CRF / CQ that meets the quality
+// level on samples of the source, with the job's codec and settings. Like
+// encode it runs in the background, can be cancelled, and reports through
+// events: enkoder-quality-progress, enkoder-log, then enkoder-quality (the
+// result), enkoder-cancelled or enkoder-error.
+func (a *app) findQuality(job jobDTO, level string) error {
+	opt, err := a.jobToOptions(job)
+	if err != nil {
+		return err
+	}
+	if opt.VideoCodec == ffmpeg.CodecCopy {
+		return errors.New(tr("quality_needs_enc"))
+	}
+	metric := a.qualityMetric()
+	if metric == "" {
+		return errors.New(tr("no_metric"))
+	}
+	target, ok := quality.Target(metric, quality.Level(level))
+	if !ok {
+		return errors.New(tr("bad_level", level))
+	}
+	duration := job.DurationSeconds
+	if duration <= 0 {
+		duration = a.probeDuration(job.Input)
+	}
+	if duration <= 0 {
+		return errors.New(tr("no_duration"))
+	}
+
+	a.mu.Lock()
+	if a.busy {
+		a.mu.Unlock()
+		return errors.New(tr("busy"))
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	a.cancel = cancel
+	a.cmd = nil
+	a.busy = true
+	a.mu.Unlock()
+
+	samples := len(quality.PlanSamples(duration))
+	a.emitEvent("enkoder-log", tr("quality_start", metric, fmtScore(metric, target), samples, opt.CQ))
+	search := &quality.Search{
+		FFmpeg:   a.ffmpegPath,
+		Base:     opt,
+		Duration: duration,
+		Metric:   metric,
+		Target:   target,
+		Level:    quality.Level(level),
+		Start:    opt.CQ,
+	}
+	trial := 0
+	search.OnSample = func(crf, sample, n int) {
+		// The search usually ends after 4–5 values; the bar counts up to
+		// MaxTrials and jumps to 100% when done.
+		pct := float64(trial*n+sample-1) / float64(quality.MaxTrials*n) * 100
+		a.emitJSON("enkoder-quality-progress", map[string]any{
+			"percent": pct, "text": tr("quality_step", crf, sample, n),
+		})
+	}
+	search.OnTrial = func(t quality.Trial, n int) {
+		trial = n
+		mark := "✗"
+		if t.Score >= target {
+			mark = "✓"
+		}
+		per := make([]string, len(t.Scores))
+		for i, v := range t.Scores {
+			per[i] = strings.TrimSuffix(fmtScore(metric, v), " dB")
+		}
+		a.emitEvent("enkoder-log", tr("quality_trial", t.CRF, metric, fmtScore(metric, t.Score), mark, strings.Join(per, ", ")))
+	}
+
+	go func() {
+		defer cancel()
+		res, err := search.Run(ctx)
+
+		a.mu.Lock()
+		a.busy = false
+		a.cancel = nil
+		a.mu.Unlock()
+
+		switch {
+		case ctx.Err() != nil:
+			a.emitEvent("enkoder-cancelled", "")
+		case err != nil:
+			a.emitEvent("enkoder-error", err.Error())
+		default:
+			if res.Met {
+				a.emitEvent("enkoder-log", tr("quality_found", res.CRF, metric, fmtScore(metric, res.Score), formatBytes(res.EstimatedBytes)))
+			} else {
+				a.emitEvent("enkoder-log", tr("quality_not_met", res.CRF, metric, fmtScore(metric, res.Score)))
+			}
+			a.emitJSON("enkoder-quality", qualityDTO{
+				CRF: res.CRF, Score: res.Score, Target: res.Target, Metric: string(res.Metric),
+				Met: res.Met, EstimatedBytes: res.EstimatedBytes, Trials: len(res.Trials),
+			})
+		}
+	}()
+	return nil
+}
+
+func fmtScore(m quality.Metric, v float64) string {
+	switch m {
+	case quality.MetricSSIM:
+		return strconv.FormatFloat(v, 'f', 4, 64)
+	case quality.MetricXPSNR:
+		return strconv.FormatFloat(v, 'f', 2, 64) + " dB"
+	}
+	return strconv.FormatFloat(v, 'f', 2, 64)
+}
+
+func formatBytes(n int64) string {
+	const mb = 1 << 20
+	if n >= 1<<30 {
+		return strconv.FormatFloat(float64(n)/(1<<30), 'f', 2, 64) + " GB"
+	}
+	return strconv.FormatFloat(float64(n)/mb, 'f', 0, 64) + " MB"
+}
+
+// emitJSON dispatches a CustomEvent whose detail is v as a JS object.
+func (a *app) emitJSON(name string, v any) {
+	payload, err := json.Marshal(v)
+	if err != nil {
+		return
+	}
+	js := fmt.Sprintf(`window.dispatchEvent(new CustomEvent(%q,{detail:%s}))`, name, string(payload))
+	a.view.Dispatch(func() {
+		a.view.Eval(js)
+	})
 }
 
 func (a *app) pumpLogs(logCh <-chan string) {

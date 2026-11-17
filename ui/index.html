@@ -194,6 +194,7 @@
       font: 12px/1.4 var(--mono); white-space: pre-wrap;
     }
     .status { font-size: 12px; color: var(--muted); }
+    .target-skin { width: 190px; }
     .status.ok { color: var(--ok); }
     .status.err { color: var(--danger); }
     .status.warn { color: var(--warn); }
@@ -416,6 +417,7 @@
         <li><strong>Preset</strong> — wolniejszy = lepsza kompresja przy tym samym CQ/CRF. libx265 domyślnie <kbd>slow</kbd>; NVENC domyślnie <kbd>p7</kbd>.</li>
         <li><strong>Tune</strong> (tylko libx265): film / animation / grain.</li>
         <li><strong>Szybkość</strong> (tylko libx265): <em>Jakość</em> — sam preset; <em>Zbalansowany</em> — ok. 2× szybciej przy praktycznie tym samym rozmiarze i jakości (<kbd>rect=0</kbd>, <kbd>rskip=2</kbd>); <em>Szybki</em> — jeszcze szybciej kosztem kilku procent rozmiaru. Procesory z AVX-512 i karty NVIDIA (dekodowanie źródła) są wykorzystywane automatycznie.</li>
+        <li><strong>Dobierz CRF</strong> — wybierz cel (<em>Wizualnie bezstratna / Wysoka / Dobra</em>); Enkoder koduje 10-sekundowe próbki z 3–6 miejsc filmu z Twoimi ustawieniami, porównuje je ze źródłem (VMAF, jeśli ffmpeg go ma, inaczej XPSNR lub SSIM) i ustawia najwyższe CRF, przy którym nawet najsłabsza próbka spełnia cel. Trwa kilka procent czasu pełnego kodowania; <strong>Anuluj</strong> przerywa.</li>
         <li><strong>Głębia bitowa</strong> — Auto bierze 10-bit (<kbd>yuv420p10le</kbd>) dla HDR lub źródła &gt;8-bit; inaczej 8-bit.</li>
         <li><strong>HDR (PQ)</strong> — dla libx265 dokłada <kbd>hdr-opt</kbd> i tagi BT.2020/SMPTE2084; dla NVENC i AV1 kopiuje tagi koloru. Metadane HDR10 (mastering display, MaxCLL) są przenoszone ze źródła; program ostrzega, gdy w źródle są uszkodzone albo gdy ginie warstwa HDR10+.</li>
         <li><strong>Deinterlace (bwdif)</strong> — zaznaczane automatycznie przy materiale przeplotowym.</li>
@@ -477,6 +479,7 @@
         <li><strong>Preset</strong> — slower = better compression at the same CQ/CRF. libx265 defaults to <kbd>slow</kbd>, NVENC to <kbd>p7</kbd>.</li>
         <li><strong>Tune</strong> (libx265 only): film / animation / grain.</li>
         <li><strong>Speed</strong> (libx265 only): <em>Quality</em> — the preset alone; <em>Balanced</em> — about 2× faster at practically the same size and quality (<kbd>rect=0</kbd>, <kbd>rskip=2</kbd>); <em>Fast</em> — faster still, at the cost of a few percent in size. CPUs with AVX-512 and NVIDIA GPUs (source decoding) are used automatically.</li>
+        <li><strong>Find CRF</strong> — pick a target (<em>Visually lossless / High / Good</em>); Enkoder encodes 10 s samples from 3–6 places in the film with your settings, measures them against the source (VMAF if ffmpeg has it, otherwise XPSNR or SSIM) and sets the highest CRF at which even the worst sample meets the target. Takes a few percent of the full encode time; <strong>Cancel</strong> stops it.</li>
         <li><strong>Bit depth</strong> — Auto picks 10-bit (<kbd>yuv420p10le</kbd>) for HDR or sources above 8-bit, otherwise 8-bit.</li>
         <li><strong>HDR (PQ)</strong> — for libx265 adds <kbd>hdr-opt</kbd> and the BT.2020/SMPTE 2084 tags; for NVENC and AV1 copies the colour tags. HDR10 metadata (mastering display, MaxCLL) is carried over from the source; Enkoder warns when it is broken in the source or when an HDR10+ layer is lost.</li>
         <li><strong>Deinterlace (bwdif)</strong> — checked automatically for interlaced sources.</li>
@@ -654,6 +657,15 @@
     <p id="codecHint" class="hint" data-i18n="detecting">Wykrywanie kodeków…</p>
     <p id="qualityHint" class="hint"></p>
     <div class="row wrap">
+      <span class="select-skin target-skin" title="Docelowa jakość: Enkoder koduje kilka próbek i wybiera najwyższe CRF, które ją spełnia" data-i18n-title="target_title">
+        <select id="qualityLevel">
+          <option value="transparent" data-i18n="q_transparent">Wizualnie bezstratna</option>
+          <option value="high" selected data-i18n="q_high">Wysoka</option>
+          <option value="good" data-i18n="q_good">Dobra</option>
+        </select>
+        <span class="select-face"></span>
+      </span>
+      <button id="btnFindCQ" type="button" disabled data-i18n="find_cq">Dobierz CRF</button>
       <button id="btnPreview" type="button" disabled data-i18n="show_command">Pokaż komendę</button>
       <button id="btnCancel" type="button" disabled data-i18n="cancel">Anuluj</button>
       <span id="runStatus" class="status grow"></span>
@@ -714,6 +726,7 @@
         about_not_found: "nie znaleziono",
         about_yes: "tak",
         about_no: "nie",
+        about_metric: "Metryka jakości",
         close: "Zamknij",
         sys_load: "Obciążenie systemu",
         source: "Plik źródłowy",
@@ -787,6 +800,15 @@
         done: "Gotowe.",
         cancelled: "Anulowano.",
         not_started: "Nie nadpisano pliku — kodowanie nie wystartowało.",
+        target_title: "Docelowa jakość: Enkoder koduje kilka próbek i wybiera najwyższe CRF, które ją spełnia",
+        q_transparent: "Wizualnie bezstratna",
+        q_high: "Wysoka",
+        q_good: "Dobra",
+        find_cq: "Dobierz CRF",
+        finding_cq: "Dobieranie CRF na próbkach…",
+        no_metric_ui: "Dobieranie CRF niedostępne: ffmpeg nie ma metryki jakości",
+        cq_found: (crf, size) => "Dobrane CRF " + crf + (size ? " · szacowany rozmiar wideo " + size : ""),
+        cq_not_met: (crf) => "Celu nie osiągnięto — ustawiono najlepsze sprawdzone CRF " + crf,
         encode_error: "Błąd kodowania",
       },
       en: {
@@ -809,6 +831,7 @@
         about_not_found: "not found",
         about_yes: "yes",
         about_no: "no",
+        about_metric: "Quality metric",
         close: "Close",
         sys_load: "System load",
         source: "Source file",
@@ -875,6 +898,15 @@
         done: "Done.",
         cancelled: "Cancelled.",
         not_started: "File not overwritten — the encode did not start.",
+        target_title: "Target quality: Enkoder encodes a few samples and picks the highest CRF that meets it",
+        q_transparent: "Visually lossless",
+        q_high: "High",
+        q_good: "Good",
+        find_cq: "Find CRF",
+        finding_cq: "Finding CRF on samples…",
+        no_metric_ui: "Find CRF unavailable: ffmpeg has no quality metric",
+        cq_found: (crf, size) => "CRF " + crf + " chosen" + (size ? " · estimated video size " + size : ""),
+        cq_not_met: (crf) => "Target not reached — set to the best CRF tried, " + crf,
         encode_error: "Encoding failed",
       },
     };
@@ -1112,6 +1144,9 @@
       $("deinterlace").disabled = copy;
       $("hdr").disabled = copy;
       if (!x265) $("tune").value = "";
+      // Busy while Cancel is enabled (encode or search running).
+      $("btnFindCQ").disabled = !$("btnCancel").disabled || !canFindCQ();
+      $("btnFindCQ").title = capsLoaded && !caps.qualityMetric ? t("no_metric_ui") : "";
       if (copy) {
         $("qualityHint").textContent = t("quality_copy");
       } else {
@@ -1361,6 +1396,8 @@
     function setBusy(busy) {
       $("btnEncode").disabled = busy || !$("inputPath").value;
       $("btnPreview").disabled = busy || !$("inputPath").value;
+      $("btnFindCQ").disabled = busy || !canFindCQ();
+      $("qualityLevel").disabled = busy;
       $("btnCancel").disabled = !busy;
       $("btnBrowseIn").disabled = busy;
       $("btnBrowseOut").disabled = busy;
@@ -1492,6 +1529,32 @@
     paintSelectFaces();
     syncQualityControls();
 
+    // "Find CRF" needs a source, a re-encode and a metric in ffmpeg.
+    function canFindCQ() {
+      return !!$("inputPath").value && $("codec").value !== "copy" && !!caps.qualityMetric;
+    }
+
+    function formatSize(bytes) {
+      if (!bytes) return "";
+      return bytes >= 1073741824 ? (bytes / 1073741824).toFixed(2) + " GB"
+        : Math.round(bytes / 1048576) + " MB";
+    }
+
+    $("btnFindCQ").onclick = async () => {
+      setT($("runStatus"), "finding_cq");
+      $("runStatus").className = "status";
+      setProgress(0, 0, 0);
+      $("progressTime").textContent = "";
+      setBusy(true);
+      try {
+        await window.enkoder.findQuality(gatherJob(), $("qualityLevel").value);
+      } catch (e) {
+        setRaw($("runStatus"), String(e));
+        $("runStatus").className = "status err";
+        setBusy(false);
+      }
+    };
+
     $("btnPreview").onclick = async () => {
       try {
         const cmd = await window.enkoder.preview(gatherJob());
@@ -1582,6 +1645,10 @@
       row("about_cuda", (dd) => { setT(dd, a.cuda ? "about_yes" : "about_no"); });
       env.append(Object.assign(document.createElement("dt"), { textContent: "AVX-512" }));
       const av = document.createElement("dd"); setT(av, a.avx512 ? "about_yes" : "about_no"); env.append(av);
+      row("about_metric", (dd) => {
+        if (a.qualityMetric) setRaw(dd, a.qualityMetric.toUpperCase());
+        else setT(dd, "about_no");
+      });
       $("btnAboutCopy").disabled = false;
     }
     window.applyAbout = function (info) {
@@ -1602,6 +1669,7 @@
         "CUDA decoding: " + yn(a.cuda),
         "libsvtav1: " + yn(a.svtav1),
         "AVX-512: " + yn(a.avx512),
+        "Quality metric: " + (a.qualityMetric || "none"),
         "UI language: " + uiLang,
       ].join("\n");
     }
@@ -1663,6 +1731,26 @@
     window.addEventListener("enkoder-cancelled", (e) => {
       setT($("runStatus"), "cancelled");
       $("runStatus").className = "status err";
+      setBusy(false);
+    });
+    window.addEventListener("enkoder-quality-progress", (e) => {
+      const d = e.detail || {};
+      setProgress(d.percent, 0, 0);
+      $("progressTime").textContent = d.text || "";
+    });
+    window.addEventListener("enkoder-quality", (e) => {
+      const r = e.detail || {};
+      $("cq").value = r.crf;
+      syncQualityControls();
+      setProgress(100, 0, 0);
+      $("progressTime").textContent = "";
+      if (r.met) {
+        setT($("runStatus"), "cq_found", r.crf, formatSize(r.estimatedBytes));
+        $("runStatus").className = "status ok";
+      } else {
+        setT($("runStatus"), "cq_not_met", r.crf);
+        $("runStatus").className = "status warn";
+      }
       setBusy(false);
     });
     // The user declined to overwrite an existing output file.
