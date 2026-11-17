@@ -80,7 +80,7 @@ Pushing a tag `v*` (for example `v0.6.1`) runs [the release workflow](.github/wo
 4. Set the codec, container, resolution and quality options (preset, tune, bit depth, HDR, deinterlace).
 5. **Save as…** — if you want a different location or name than the suggested one. The output field can also be edited by hand.
 6. **Show command** — preview the ffmpeg command without starting the encode.
-7. **Encode** — start. **Cancel** stops a running encode.
+7. **Encode** — start. **Cancel** stops a running encode. After a cancel or an error the incomplete output file is deleted (a file ffmpeg never got to write is left alone).
 
 The **Help** button in the window repeats these rules in short.
 
