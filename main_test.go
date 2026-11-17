@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"enkoder/internal/ffmpeg"
 )
 
 func TestSameFile(t *testing.T) {
@@ -172,5 +174,151 @@ func TestEncodeAsksBeforeOverwrite(t *testing.T) {
 	}
 	if ev := view.waitEvent(t); ev != "enkoder-done" {
 		t.Fatalf("new file: event %s", ev)
+	}
+}
+
+func TestRemovePartialOutput(t *testing.T) {
+	dir := t.TempDir()
+
+	// Created by the run: removed.
+	fresh := filepath.Join(dir, "fresh.mkv")
+	if err := os.WriteFile(fresh, []byte("half"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if removed, err := removePartialOutput(fresh, nil); err != nil || !removed || fileExists(fresh) {
+		t.Fatalf("fresh: removed=%v err=%v", removed, err)
+	}
+
+	// Older file ffmpeg never opened: kept.
+	old := filepath.Join(dir, "old.mkv")
+	if err := os.WriteFile(old, []byte("old film"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.Stat(old)
+	if removed, err := removePartialOutput(old, before); err != nil || removed || !fileExists(old) {
+		t.Fatalf("untouched: removed=%v err=%v", removed, err)
+	}
+
+	// Older file that the run truncated and rewrote: removed.
+	past := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(old, past, past); err != nil {
+		t.Fatal(err)
+	}
+	before, _ = os.Stat(old)
+	if err := os.WriteFile(old, []byte("half"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if removed, err := removePartialOutput(old, before); err != nil || !removed {
+		t.Fatalf("rewritten: removed=%v err=%v", removed, err)
+	}
+
+	// Nothing there: nothing to do.
+	if removed, err := removePartialOutput(filepath.Join(dir, "none.mkv"), nil); err != nil || removed {
+		t.Fatalf("missing: removed=%v err=%v", removed, err)
+	}
+}
+
+func TestFailedEncodeKeepsUntouchedOutput(t *testing.T) {
+	ffmpegPath := findTool("ffmpeg")
+	if ffmpegPath == "" {
+		t.Skip("no ffmpeg")
+	}
+	dir := t.TempDir()
+	src := filepath.Join(dir, "broken.mkv")
+	if err := os.WriteFile(src, []byte("not a video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(dir, "dst.mkv")
+	if err := os.WriteFile(dst, []byte("keep me"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	orig := confirmOverwrite
+	defer func() { confirmOverwrite = orig }()
+	confirmOverwrite = func(string) bool { return true }
+
+	view := &fakeView{events: make(chan string, 1024)}
+	a := &app{ffmpegPath: ffmpegPath, view: view}
+	job := jobDTO{Input: src, Output: dst, Video: []int{0}, Codec: "copy", Container: "mkv"}
+	if err := a.encode(job); err != nil {
+		t.Fatal(err)
+	}
+	if ev := view.waitEvent(t); ev != "enkoder-error" {
+		t.Fatalf("event %s", ev)
+	}
+	if b, _ := os.ReadFile(dst); string(b) != "keep me" {
+		t.Fatal("a run that never opened the output removed or changed it")
+	}
+}
+
+func TestCancelledEncodeRemovesOutput(t *testing.T) {
+	ffmpegPath := findTool("ffmpeg")
+	if ffmpegPath == "" {
+		t.Skip("no ffmpeg")
+	}
+	if _, err := exec.LookPath("mkfifo"); err != nil {
+		t.Skip("no mkfifo")
+	}
+	dir := t.TempDir()
+	clip := filepath.Join(dir, "clip.mkv")
+	gen := exec.Command(ffmpegPath, "-v", "error", "-f", "lavfi", "-i", "testsrc=size=64x64:rate=5",
+		"-t", "2", "-c:v", "mpeg4", clip)
+	if out, err := gen.CombinedOutput(); err != nil {
+		t.Fatalf("generate clip: %v\n%s", err, out)
+	}
+	// The source is a FIFO that is never closed, so ffmpeg writes the
+	// output and then waits for more input until it is cancelled.
+	src := filepath.Join(dir, "src.mkv")
+	if out, err := exec.Command("mkfifo", src).CombinedOutput(); err != nil {
+		t.Fatalf("mkfifo: %v\n%s", err, out)
+	}
+	data, err := os.ReadFile(clip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		w, err := os.OpenFile(src, os.O_WRONLY, 0)
+		if err != nil {
+			return
+		}
+		_, _ = w.Write(data)
+		time.Sleep(30 * time.Second)
+		w.Close()
+	}()
+
+	dst := filepath.Join(dir, "dst.mkv")
+	view := &fakeView{events: make(chan string, 4096)}
+	a := &app{ffmpegPath: ffmpegPath, view: view}
+	job := jobDTO{Input: src, Output: dst, Video: []int{0}, Codec: "copy", Container: "mkv", DurationSeconds: 2}
+	if err := a.encode(job); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(15 * time.Second)
+	for !fileExists(dst) {
+		if time.Now().After(deadline) {
+			t.Fatal("ffmpeg never created the output")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	a.cancelEncode()
+	if ev := view.waitEvent(t); ev != "enkoder-cancelled" {
+		t.Fatalf("event %s", ev)
+	}
+	if fileExists(dst) {
+		t.Fatal("incomplete output left after cancel")
+	}
+}
+
+func TestDefaultSpeedIsBalanced(t *testing.T) {
+	job := jobDTO{Input: "in.mkv", Output: "out.mkv", Video: []int{0}, Codec: "libx265", Container: "mkv"}
+	opt, err := (&app{}).jobToOptions(job)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opt.Speed != ffmpeg.SpeedBalanced {
+		t.Fatalf("default speed = %q, want balanced (as in the UI)", opt.Speed)
+	}
+	job.Speed = "quality"
+	if opt, _ = (&app{}).jobToOptions(job); opt.Speed != ffmpeg.SpeedQuality {
+		t.Fatalf("explicit quality = %q", opt.Speed)
 	}
 }

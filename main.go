@@ -380,6 +380,9 @@ func (a *app) startEncode(job jobDTO, opt ffmpeg.Options) error {
 		_ = a.cmd.Process.Kill()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	// Stan pliku wynikowego przed startem: po błędzie usuwamy tylko to,
+	// co ffmpeg faktycznie utworzył lub nadpisał.
+	before, _ := os.Stat(opt.Output)
 	a.cancel = cancel
 	a.cmd = nil
 	a.busy = true
@@ -464,6 +467,16 @@ func (a *app) startEncode(job jobDTO, opt ffmpeg.Options) error {
 		durMu.Lock()
 		finalDur := dur
 		durMu.Unlock()
+
+		if runErr != nil {
+			removed, err := removePartialOutput(opt.Output, before)
+			switch {
+			case err != nil:
+				a.emitEvent("enkoder-log", tr("partial_remove_failed", opt.Output, err))
+			case removed:
+				a.emitEvent("enkoder-log", tr("partial_removed", opt.Output))
+			}
+		}
 
 		switch {
 		case runErr == nil:
@@ -650,7 +663,7 @@ func (a *app) jobToOptions(j jobDTO) (ffmpeg.Options, error) {
 	speed := ffmpeg.X265Speed(strings.TrimSpace(j.Speed))
 	switch speed {
 	case "":
-		speed = ffmpeg.SpeedQuality
+		speed = ffmpeg.SpeedBalanced // the UI default
 	case ffmpeg.SpeedQuality, ffmpeg.SpeedBalanced, ffmpeg.SpeedFast:
 	default:
 		return ffmpeg.Options{}, errors.New(tr("bad_speed", speed))
@@ -771,6 +784,28 @@ func sameFile(a, b string) bool {
 		return false
 	}
 	return os.SameFile(ai, bi)
+}
+
+// removePartialOutput deletes the output of a failed or cancelled encode.
+// before is the file's state ahead of the run (nil if it did not exist): a
+// file ffmpeg never opened (same size and mtime) is left alone, so a run
+// that failed early does not delete an older file the user still has.
+func removePartialOutput(path string, before os.FileInfo) (bool, error) {
+	now, err := os.Lstat(path)
+	if err != nil {
+		return false, nil // nothing was written
+	}
+	if !now.Mode().IsRegular() {
+		return false, nil
+	}
+	if before != nil && os.SameFile(before, now) &&
+		before.Size() == now.Size() && before.ModTime().Equal(now.ModTime()) {
+		return false, nil
+	}
+	if err := os.Remove(path); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // fileExists is true for anything already at path (file, directory, link).
