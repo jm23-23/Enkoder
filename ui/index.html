@@ -786,6 +786,7 @@
         cancelling: "Anulowanie…",
         done: "Gotowe.",
         cancelled: "Anulowano.",
+        not_started: "Nie nadpisano pliku — kodowanie nie wystartowało.",
         encode_error: "Błąd kodowania",
       },
       en: {
@@ -873,6 +874,7 @@
         cancelling: "Cancelling…",
         done: "Done.",
         cancelled: "Cancelled.",
+        not_started: "File not overwritten — the encode did not start.",
         encode_error: "Encoding failed",
       },
     };
@@ -1315,6 +1317,14 @@
     }
     window.applySystemStats = applySystemStats;
 
+    // Etykiety ścieżek pochodzą z metadanych pliku (tytuł, język), więc
+    // mogą zawierać dowolny HTML — zawsze escapujemy przed innerHTML.
+    function escapeHTML(v) {
+      return String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[c]));
+    }
+
     function renderStreams(list) {
       streams = list || [];
       const box = $("streams");
@@ -1335,8 +1345,8 @@
           <div class="meta">
             ${I18N.en["type_" + s.codec_type]
               ? `<div class="type" data-i18n="type_${s.codec_type}">${t("type_" + s.codec_type)}</div>`
-              : `<div class="type">${s.codec_type}</div>`}
-            <div>${s.label}</div>
+              : `<div class="type">${escapeHTML(s.codec_type)}</div>`}
+            <div>${escapeHTML(s.label)}</div>
           </div>
         </label>`;
       }).join("");
@@ -1653,6 +1663,13 @@
     window.addEventListener("enkoder-cancelled", (e) => {
       setT($("runStatus"), "cancelled");
       $("runStatus").className = "status err";
+      setBusy(false);
+    });
+    // The user declined to overwrite an existing output file.
+    window.addEventListener("enkoder-not-started", (e) => {
+      resetProgress();
+      setT($("runStatus"), "not_started");
+      $("runStatus").className = "status";
       setBusy(false);
     });
 
