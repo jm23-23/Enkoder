@@ -14,11 +14,17 @@ A small desktop GUI for re-encoding videos with ffmpeg, for Linux and Windows. P
 
 At run time:
 
-- **ffmpeg** and **ffprobe** in `PATH`
+- **ffmpeg** and **ffprobe** in `PATH` (or a custom path, see below)
 - on Linux also **zenity** (file dialogs) and the window libraries `libgtk-3-0` and `libwebkit2gtk-4.1-0` (or `libwebkit2gtk-4.0`)
 - on Windows **WebView2** (the Edge runtime; usually already installed)
 
-Enkoder looks for the tools in `PATH` first, then in fixed locations: `/usr/bin` and `/usr/local/bin` on Linux, `c:\ffmpeg\bin` on Windows. If one is missing, it shows a message at startup and exits.
+Enkoder picks ffmpeg in this order:
+
+1. **Settings → ffmpeg path** — a custom ffmpeg, e.g. your own build with libvmaf. Give the `ffmpeg` file or the folder it is in; `ffprobe` is taken from the same folder (or found the usual way if it is not there). **Check** shows the version, the quality metric and whether NVENC / SVT-AV1 are available; **Save** stores only a path that runs as ffmpeg; **Automatic** removes it. The new path takes effect after a restart — the window offers a **Restart** button.
+2. the `ENKODER_FFMPEG` environment variable (file or folder; `ENKODER_FFPROBE` overrides ffprobe),
+3. `PATH`, then fixed locations: `/usr/bin` and `/usr/local/bin` on Linux, `c:\ffmpeg\bin` on Windows.
+
+A saved path that stops working (moved, deleted) is skipped with a note in the log and in Settings, so Enkoder still starts with the next ffmpeg it finds. If none is found, it shows a message at startup and exits. The setting is kept in `settings.json` in the user config folder (`~/.config/enkoder/` on Linux, `%AppData%\enkoder\` on Windows).
 
 On Debian / Ubuntu:
 
@@ -84,7 +90,7 @@ Pushing a tag `v*` (for example `v0.6.1`) runs [the release workflow](.github/wo
 
 The **Help** button in the window repeats these rules in short.
 
-**About** (or a click on the version number) shows the version, the licence, links to the project and the detected environment: ffmpeg / ffprobe versions and paths, NVENC, CUDA, SVT-AV1 and AVX-512. **Copy info** puts that on the clipboard in English, ready to paste into a bug report.
+**About** (or a click on the version number) shows the version, the licence, links to the project and the detected environment: ffmpeg / ffprobe versions and paths (and where the ffmpeg came from: setting, environment variable or automatic search), NVENC, CUDA, SVT-AV1 and AVX-512. **Copy info** puts that on the clipboard in English, ready to paste into a bug report.
 
 ### Language
 
@@ -143,7 +149,7 @@ The log shows every value tried with the per-sample scores, and the status line 
 | High | 95 | 39.5 dB | 0.975 | 24 | 28 |
 | Good | 93 | 37.5 dB | 0.965 | 28 | 36 |
 
-The XPSNR and SSIM targets were measured on four 1080p films; on grainy Blu-rays they land near CRF 15 / 18 / 21 with x265. Clean, soft sources (typical WEB-DLs) score much higher on these metrics than they look, so each target also has a maximum CRF. VMAF tracks perception better; if your ffmpeg has libvmaf, Enkoder uses it automatically (About shows which metric is in use).
+The XPSNR and SSIM targets were measured on four 1080p films; on grainy Blu-rays they land near CRF 15 / 18 / 21 with x265. Clean, soft sources (typical WEB-DLs) score much higher on these metrics than they look, so each target also has a maximum CRF. VMAF tracks perception better; if your ffmpeg has libvmaf, Enkoder uses it automatically (About shows which metric is in use). Distribution ffmpeg packages often lack libvmaf; point **Settings → ffmpeg path** at a build that has it.
 
 ### Preset, tune, 10-bit, HDR
 

@@ -153,3 +153,12 @@ func pickLog(format string, args ...interface{}) {
 	line := time.Now().Format("15:04:05.000") + " " + fmt.Sprintf(format, args...) + "\n"
 	_, _ = f.WriteString(line)
 }
+
+// pickExecutable lets the user choose the ffmpeg program.
+func pickExecutable() (string, error) {
+	path, err := runZenityFile(false, tr("pick_ffmpeg"), "", []string{
+		"--file-filter=ffmpeg | ffmpeg*",
+		"--file-filter=" + tr("filter_all") + " | *",
+	})
+	return normalizePickedPath(path), err
+}

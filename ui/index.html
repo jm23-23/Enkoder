@@ -295,6 +295,11 @@
     .about-env dd { margin: 0; font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
     .about-env .yes { color: var(--ok); }
     .about-env .no { color: var(--muted); }
+    .ffpath-row { margin: 6px 0; }
+    .ffpath-row input { font-family: var(--mono); font-size: 12px; }
+    .ffpath-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+    #ffpathStatus, #ffpathInUse { overflow-wrap: anywhere; }
+    #ffpathInUse { font-family: var(--mono); font-size: 12px; }
     #aboutCopied { margin-right: auto; align-self: center; font-size: 12px; color: var(--ok); }
     .modal kbd {
       font: 12px var(--mono); background: #0e1218; border: 1px solid var(--border);
@@ -361,6 +366,7 @@
         <button type="button" data-set-lang="en" title="English">EN</button>
       </div>
       <button id="btnHelp" class="ghost" type="button" data-i18n="help" data-i18n-title="help">Pomoc</button>
+      <button id="btnSettings" class="ghost" type="button" data-i18n="settings" data-i18n-title="settings">Ustawienia</button>
       <button id="btnAbout" class="ghost" type="button" data-i18n="about" data-i18n-title="about">O programie</button>
     </div>
   </div>
@@ -538,6 +544,32 @@
         <button id="btnAboutCopy" class="ghost" type="button" disabled
           data-i18n="about_copy" data-i18n-title="about_copy_hint">Kopiuj informacje</button>
         <button id="btnAboutClose" class="primary" type="button" data-i18n="close">Zamknij</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal">
+      <h2 id="settingsTitle" data-i18n="settings">Ustawienia</h2>
+      <h3 data-i18n="ffpath_title">Ścieżka do ffmpeg</h3>
+      <p class="hint" data-i18n="ffpath_hint">Własny ffmpeg, np. zbudowany z libvmaf.</p>
+      <div class="row ffpath-row">
+        <input id="ffpathInput" class="grow" type="text" spellcheck="false"
+          placeholder="automatycznie" data-i18n-placeholder="ffpath_placeholder" />
+        <button id="btnFFPick" type="button" data-i18n="browse">Przeglądaj…</button>
+      </div>
+      <div class="ffpath-actions">
+        <button id="btnFFCheck" type="button" data-i18n="ffpath_check">Sprawdź</button>
+        <button id="btnFFSave" class="primary" type="button" data-i18n="ffpath_save">Zapisz</button>
+        <button id="btnFFAuto" class="ghost" type="button" data-i18n="ffpath_auto" data-i18n-title="ffpath_auto_hint">Automatycznie</button>
+      </div>
+      <p id="ffpathStatus" class="status" aria-live="polite"></p>
+      <p class="hint"><span data-i18n="ffpath_in_use">W użyciu</span>: <span id="ffpathInUse">—</span></p>
+      <p id="ffpathProblem" class="status warn" hidden></p>
+      <p id="ffpathPending" class="status warn" hidden data-i18n="ffpath_pending">Nowa ścieżka zadziała po ponownym uruchomieniu.</p>
+      <div class="modal-actions">
+        <button id="btnRestart" type="button" hidden data-i18n="ffpath_restart">Uruchom ponownie</button>
+        <button id="btnSettingsClose" class="primary" type="button" data-i18n="close">Zamknij</button>
       </div>
     </div>
   </div>
@@ -727,6 +759,25 @@
         about_yes: "tak",
         about_no: "nie",
         about_metric: "Metryka jakości",
+        settings: "Ustawienia",
+        ffpath_title: "Ścieżka do ffmpeg",
+        ffpath_hint: "Własny ffmpeg, np. zbudowany z libvmaf. Podaj plik ffmpeg albo folder, w którym leży — ffprobe jest brany z tego samego folderu. Puste pole = wyszukiwanie automatyczne (PATH i typowe foldery).",
+        ffpath_placeholder: "automatycznie",
+        ffpath_check: "Sprawdź",
+        ffpath_save: "Zapisz",
+        ffpath_auto: "Automatycznie",
+        ffpath_auto_hint: "Usuwa własną ścieżkę — ffmpeg będzie wyszukiwany automatycznie",
+        ffpath_checking: "Sprawdzanie…",
+        ffpath_ok: (ver, metric) => "ffmpeg " + ver + " · metryka: " + (metric || "brak"),
+        ffpath_ffprobe: "ffprobe",
+        ffpath_in_use: "W użyciu",
+        ffpath_src_setting: "z ustawienia",
+        ffpath_src_env: "ze zmiennej ENKODER_FFMPEG",
+        ffpath_src_auto: "wyszukany automatycznie",
+        ffpath_problem: (p) => "Zapisanej ścieżki nie da się użyć: " + p,
+        ffpath_pending: "Zapisano. Nowe ustawienie zadziała po ponownym uruchomieniu Enkodera.",
+        ffpath_restart: "Uruchom ponownie",
+        ffpath_saved: "Zapisano.",
         close: "Zamknij",
         sys_load: "Obciążenie systemu",
         source: "Plik źródłowy",
@@ -832,6 +883,25 @@
         about_yes: "yes",
         about_no: "no",
         about_metric: "Quality metric",
+        settings: "Settings",
+        ffpath_title: "ffmpeg path",
+        ffpath_hint: "A custom ffmpeg, e.g. one built with libvmaf. Give the ffmpeg file or the folder it is in — ffprobe is taken from the same folder. Empty = search automatically (PATH and the usual folders).",
+        ffpath_placeholder: "automatic",
+        ffpath_check: "Check",
+        ffpath_save: "Save",
+        ffpath_auto: "Automatic",
+        ffpath_auto_hint: "Removes the custom path — ffmpeg is searched for automatically",
+        ffpath_checking: "Checking…",
+        ffpath_ok: (ver, metric) => "ffmpeg " + ver + " · metric: " + (metric || "none"),
+        ffpath_ffprobe: "ffprobe",
+        ffpath_in_use: "In use",
+        ffpath_src_setting: "from the setting",
+        ffpath_src_env: "from ENKODER_FFMPEG",
+        ffpath_src_auto: "found automatically",
+        ffpath_problem: (p) => "The saved path cannot be used: " + p,
+        ffpath_pending: "Saved. The new setting takes effect after Enkoder restarts.",
+        ffpath_restart: "Restart",
+        ffpath_saved: "Saved.",
         close: "Close",
         sys_load: "System load",
         source: "Source file",
@@ -1634,7 +1704,14 @@
         else setT(dd, "about_not_found");
       };
       env.append(Object.assign(document.createElement("dt"), { textContent: "ffmpeg" }));
-      const ff = document.createElement("dd"); tool(ff, a.ffmpegVersion, a.ffmpegPath); env.append(ff);
+      const ff = document.createElement("dd"); tool(ff, a.ffmpegVersion, a.ffmpegPath);
+      if (a.ffmpegPath && a.ffmpegSource) {
+        const src = document.createElement("span");
+        src.className = "no";
+        setT(src, "ffpath_src_" + a.ffmpegSource);
+        ff.append(" (", src, ")");
+      }
+      env.append(ff);
       env.append(Object.assign(document.createElement("dt"), { textContent: "ffprobe" }));
       const fp = document.createElement("dd"); tool(fp, a.ffprobeVersion, a.ffprobePath); env.append(fp);
       row("about_encoders", (dd) => {
@@ -1663,7 +1740,7 @@
       return [
         "Enkoder " + (a.version || "{{VERSION}}"),
         "OS: " + (a.os || "?"),
-        "ffmpeg: " + tool(a.ffmpegVersion, a.ffmpegPath),
+        "ffmpeg: " + tool(a.ffmpegVersion, a.ffmpegPath) + (a.ffmpegSource ? " [" + a.ffmpegSource + "]" : ""),
         "ffprobe: " + tool(a.ffprobeVersion, a.ffprobePath),
         "hevc_nvenc: " + yn(a.nvenc) + (a.nvenc ? " (hq: " + yn(a.nvencTuned) + ")" : ""),
         "CUDA decoding: " + yn(a.cuda),
@@ -1673,6 +1750,79 @@
         "UI language: " + uiLang,
       ].join("\n");
     }
+    // Settings: the custom ffmpeg path. Go answers with applyFFmpegSettings /
+    // applyFFmpegCheck / applyFFmpegPicked (Eval), like the About window.
+    let ffSaving = false;
+    function ffStatus(kind, key, ...args) {
+      const el = $("ffpathStatus");
+      el.className = "status" + (kind ? " " + kind : "");
+      if (key) setT(el, key, ...args); else setRaw(el, "");
+    }
+    window.applyFFmpegSettings = function (st) {
+      $("ffpathInput").value = st.setting || "";
+      const use = $("ffpathInUse");
+      use.replaceChildren();
+      const src = document.createElement("span");
+      src.className = "hint";
+      setT(src, "ffpath_src_" + (st.source || "auto"));
+      use.append(st.ffmpeg || "—", " (", src, ")");
+      const prob = $("ffpathProblem");
+      prob.hidden = !st.problem;
+      if (st.problem) setT(prob, "ffpath_problem", st.problem);
+      $("ffpathPending").hidden = !st.pending;
+      $("btnRestart").hidden = !st.pending;
+      if (ffSaving) ffStatus("ok", st.pending ? "" : "ffpath_saved");
+      ffSaving = false;
+    };
+    window.applyFFmpegCheck = function (d) {
+      if (d.input !== $("ffpathInput").value.trim()) return; // stale answer
+      if (!d.ok) { ffSaving = false; ffStatus("err", ""); setRaw($("ffpathStatus"), d.error); return; }
+      ffStatus("ok", "ffpath_ok", d.version, d.metric ? d.metric.toUpperCase() : "");
+      const el = $("ffpathStatus");
+      const flags = document.createElement("span");
+      flags.className = "about-env";
+      flags.style.display = "inline";
+      aboutFlag(flags, " · hevc_nvenc", d.nvenc);
+      aboutFlag(flags, "libsvtav1", d.svtav1);
+      el.append(flags, " · ffprobe: " + (d.ffprobe || "—"));
+    };
+    window.applyFFmpegPicked = function (path) {
+      $("ffpathInput").value = path;
+      ffStatus("", "ffpath_checking");
+    };
+    function openSettings() {
+      $("settingsModal").classList.add("open");
+      fireAndForget(window.enkoder.getFFmpegSettings);
+    }
+    function closeSettings() { $("settingsModal").classList.remove("open"); }
+    $("btnSettings").onclick = openSettings;
+    $("btnSettingsClose").onclick = closeSettings;
+    $("settingsModal").onclick = (e) => { if (e.target === $("settingsModal")) closeSettings(); };
+    $("btnFFPick").onclick = () => fireAndForget(window.enkoder.pickFFmpeg);
+    $("btnFFCheck").onclick = () => {
+      const p = $("ffpathInput").value.trim();
+      if (!p) { ffStatus("", ""); return; }
+      ffStatus("", "ffpath_checking");
+      fireAndForget(window.enkoder.checkFFmpeg, p);
+    };
+    $("btnFFSave").onclick = () => {
+      const p = $("ffpathInput").value.trim();
+      ffSaving = true;
+      ffStatus("", p ? "ffpath_checking" : "");
+      fireAndForget(window.enkoder.saveFFmpegPath, p);
+    };
+    $("btnFFAuto").onclick = () => {
+      $("ffpathInput").value = "";
+      ffSaving = true;
+      ffStatus("", "");
+      fireAndForget(window.enkoder.saveFFmpegPath, "");
+    };
+    $("ffpathInput").onkeydown = (e) => { if (e.key === "Enter") $("btnFFCheck").click(); };
+    $("btnRestart").onclick = () => fireAndForget(window.enkoder.restartApp);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && $("settingsModal").classList.contains("open")) closeSettings();
+    });
+
     function openAbout() {
       if (!$("aboutLogo").firstChild) {
         const logo = document.querySelector(".topbar .logo");

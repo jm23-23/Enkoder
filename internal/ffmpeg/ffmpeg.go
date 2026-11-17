@@ -135,6 +135,12 @@ func ResetNVENCCache() {
 	nvencOK = false
 }
 
+// HasEncoder reports whether ffmpeg lists the named encoder. Not cached:
+// used to check a candidate ffmpeg before it is put to use.
+func HasEncoder(ffmpegPath, name string) bool {
+	return detectEncoder(ffmpegPath, name)
+}
+
 func detectEncoder(ffmpegPath, name string) bool {
 	if strings.TrimSpace(ffmpegPath) == "" {
 		return false
