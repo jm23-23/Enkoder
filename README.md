@@ -170,7 +170,7 @@ A summary of what **Show command** shows:
 - metadata / chapters: `-map_metadata 0` and `-map_chapters 0` when re-encoding
 - downscaling with the `scale` filter using `lanczos`; interlaced sources: `bwdif`
 - NVENC with scaling or deinterlacing: when NVDEC can decode the source (checked on one frame before starting), everything stays on the GPU: `-hwaccel_output_format cuda`, `bwdif_cuda=mode=send_field`, `scale_cuda` with `lanczos`. For 4K HDR → 1080p with deinterlacing this is about 2× faster. Sources NVDEC does not support (for example H.264 4:2:2) stay on CPU filters.
-- an existing output file is overwritten (`-y`)
+- an existing output file is overwritten (`-y`), but only after Enkoder asks; an output that is the source file itself (also through a link) is refused
 
 ## License
 

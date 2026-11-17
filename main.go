@@ -341,7 +341,33 @@ func (a *app) encode(job jobDTO) error {
 	if err != nil {
 		return err
 	}
+	a.mu.Lock()
+	busy := a.busy
+	a.mu.Unlock()
+	if busy {
+		return errors.New(tr("busy"))
+	}
+	// ffmpeg dostaje -y, więc o nadpisanie istniejącego pliku pytamy tutaj.
+	// Dialog blokuje, dlatego w gorutynie; wynik idzie zdarzeniem, bo na
+	// Linuksie obietnice z Bind mogą się nigdy nie rozwiązać.
+	if fileExists(opt.Output) {
+		go func() {
+			if !confirmOverwrite(opt.Output) {
+				a.emitEvent("enkoder-not-started", "")
+				return
+			}
+			if err := a.startEncode(job, opt); err != nil {
+				a.emitEvent("enkoder-error", err.Error())
+			}
+		}()
+		return nil
+	}
+	return a.startEncode(job, opt)
+}
 
+// startEncode runs a validated job; the caller has already dealt with an
+// existing output file.
+func (a *app) startEncode(job jobDTO, opt ffmpeg.Options) error {
 	a.mu.Lock()
 	if a.busy {
 		a.mu.Unlock()
@@ -550,6 +576,9 @@ func (a *app) jobToOptions(j jobDTO) (ffmpeg.Options, error) {
 	if strings.TrimSpace(j.Output) == "" {
 		return ffmpeg.Options{}, errors.New(tr("no_output"))
 	}
+	if sameFile(j.Input, j.Output) {
+		return ffmpeg.Options{}, errors.New(tr("same_file"))
+	}
 	if len(j.Video) == 0 {
 		return ffmpeg.Options{}, errors.New(tr("no_video"))
 	}
@@ -728,6 +757,36 @@ func validatePreset(codec ffmpeg.VideoCodec, preset string) error {
 		}
 	}
 	return errors.New(tr("bad_preset", preset, codec))
+}
+
+// sameFile reports whether both paths name the same existing file, also
+// through symlinks, hard links or a different letter case on Windows.
+func sameFile(a, b string) bool {
+	ai, err := os.Stat(strings.TrimSpace(a))
+	if err != nil {
+		return false
+	}
+	bi, err := os.Stat(strings.TrimSpace(b))
+	if err != nil {
+		return false
+	}
+	return os.SameFile(ai, bi)
+}
+
+// fileExists is true for anything already at path (file, directory, link).
+func fileExists(path string) bool {
+	_, err := os.Lstat(path)
+	return err == nil
+}
+
+// confirmOverwrite asks before ffmpeg replaces an existing output file.
+var confirmOverwrite = func(path string) bool {
+	err := zenity.Question(tr("overwrite_q", path),
+		zenity.Title(appTitle()),
+		zenity.WarningIcon,
+		zenity.OKLabel(tr("overwrite_ok")),
+		zenity.CancelLabel(tr("overwrite_cancel")))
+	return err == nil
 }
 
 func suggestExt(container string) string {
